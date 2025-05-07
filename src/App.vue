@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType } from '@vue-flow/core'
-import type { Connection, Edge, Node } from '@vue-flow/core' // Ensure Connection is imported
+import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node } from '@vue-flow/core' // Ensure Connection is imported
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { Controls } from '@vue-flow/controls'
 import { storeToRefs } from 'pinia'
 import { useWorkspaceStore } from './stores/workspace'
-import { computed, markRaw, nextTick } from 'vue'
+import { computed, markRaw, nextTick, ref as vueRef } from 'vue' // IMPORTED ref as vueRef
 
 // Import your custom node
 import ScenarioCardNode from './components/ScenarioCardNode.vue'
@@ -14,7 +13,7 @@ import ScenarioCardNode from './components/ScenarioCardNode.vue'
 const workspaceStore = useWorkspaceStore()
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore)
 
-const { fitView, onPaneReady, getViewport, getNodes, onNodeDragStop } = useVueFlow()
+const { fitView, onPaneReady, getViewport, getNodes, onNodeDragStop, addEdges } = useVueFlow() // addEdges might be useful, but addEdgeHelper is also fine
 
 onPaneReady(async ({ fitView: fitViewInstance }) => {
   console.log('Vue Flow Pane is ready.');
@@ -36,30 +35,16 @@ const nodeTypes = computed(() => ({
 }))
 
 const onConnect = (connectionParams: Connection) => {
-  // Log the raw parameters received from the connect event
   console.log('Raw connectionParams from event:', JSON.parse(JSON.stringify(connectionParams)));
-  // connectionParams.source is the ID of the node Vue Flow considers the source (e.g., where a 'source' type handle is)
-  // connectionParams.target is the ID of the node Vue Flow considers the target (e.g., where a 'target' type handle is)
-
-  // If the user drags from visual A to visual B, but the types of handles cause Vue Flow
-  // to report source=B and target=A, then the arrow markerEnd (pointing to target)
-  // would point to A, which is the reverse of the drag gesture.
-
-  // To make the arrow ALWAYS follow the drag gesture:
-  // We assume the user *wants* the arrow to point from the node represented by connectionParams.target (from Vue Flow's perspective)
-  // to the node represented by connectionParams.source (from Vue Flow's perspective), if the arrow is currently reversed.
-  // This effectively means the edge's logical source should be what Vue Flow called 'target' in the event,
-  // and the edge's logical target should be what Vue Flow called 'source'.
 
   const newEdge: Edge = {
-    // Swapping source and target from the connectionParams
-    source: connectionParams.target!,       // This will be the tail of the arrow
-    target: connectionParams.source!,       // This will be the head of the arrow
-    sourceHandle: connectionParams.targetHandle || undefined, // Swap handles too
-    targetHandle: connectionParams.sourceHandle || undefined, // Swap handles too
+    source: connectionParams.target!,
+    target: connectionParams.source!,
+    sourceHandle: connectionParams.targetHandle || undefined,
+    targetHandle: connectionParams.sourceHandle || undefined,
     id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgt'}-${connectionParams.sourceHandle || 'nodeSrc'}-${Date.now()}`,
     label: 'Connection',
-    markerEnd: MarkerType.ArrowClosed, // Arrow head will point to the 'target' of this newEdge object
+    markerEnd: MarkerType.ArrowClosed,
   };
 
   edges.value = addEdgeHelper(newEdge, edges.value);
@@ -149,6 +134,101 @@ onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) =
   }
 });
 
+// --- START: Save and Load Layout ---
+const fileInput = vueRef<HTMLInputElement | null>(null);
+
+const saveLayout = () => {
+  try {
+    const layoutData = {
+      hostUrl: hostUrl.value,
+      nodes: JSON.parse(JSON.stringify(nodes.value)), // Deep copy for clean serialization
+      edges: JSON.parse(JSON.stringify(edges.value)), // Deep copy for clean serialization
+    };
+    const jsonString = JSON.stringify(layoutData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = `scenario-layout-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+    console.log('Layout saved.');
+    alert('Layout saved successfully!');
+  } catch (error) {
+    console.error('Failed to save layout:', error);
+    alert('Error saving layout. See console for details.');
+  }
+};
+
+const triggerLoadDialog = () => {
+  fileInput.value?.click();
+};
+
+const handleFileLoad = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files[0]) {
+    const file = target.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const loadedData = JSON.parse(content);
+
+        if (
+          loadedData &&
+          typeof loadedData.hostUrl === 'string' &&
+          Array.isArray(loadedData.nodes) &&
+          Array.isArray(loadedData.edges)
+        ) {
+          workspaceStore.updateHostUrl(loadedData.hostUrl);
+
+          // It's crucial to ensure the loaded objects are reactive and have the expected structure
+          nodes.value = loadedData.nodes.map((n: any) => ({
+            ...n,
+            position: { x: n.position?.x || 0, y: n.position?.y || 0 }, // Ensure position is a plain object
+            data: { ...n.data }, // Ensure data is also a plain object if nested
+            // type: 'scenarioCard' // Ensure type is correctly set if not always present or if it can vary
+          }));
+
+          edges.value = loadedData.edges.map((edge: any) => ({
+            ...edge,
+            markerEnd: edge.markerEnd || MarkerType.ArrowClosed, // Ensure markerEnd is present
+            // label: edge.label || 'Connection' // Ensure label if it might be missing
+          }));
+
+          console.log('Layout loaded successfully.');
+          await nextTick();
+          fitView({ padding: 0.1 });
+          alert('Layout loaded successfully!');
+        } else {
+          alert('Invalid layout file format.');
+          console.error('Invalid layout file format:', loadedData);
+        }
+      } catch (error) {
+        alert('Failed to load or parse layout file. See console for details.');
+        console.error('Error loading layout:', error);
+      } finally {
+        // Reset file input to allow loading the same file again if needed
+        if (fileInput.value) {
+          fileInput.value.value = '';
+        }
+      }
+    };
+    reader.onerror = () => {
+      alert('Failed to read file.');
+      console.error('Error reading file:', reader.error);
+       if (fileInput.value) {
+        fileInput.value.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }
+};
+// --- END: Save and Load Layout ---
+
 </script>
 
 <template>
@@ -166,8 +246,20 @@ onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) =
         <button @click="fitView({ padding: 0.1 })" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-sm rounded">
           Fit View
         </button>
+        <!-- START: New Buttons -->
+        <button @click="saveLayout" class="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 text-sm rounded">
+          Save Layout
+        </button>
+        <button @click="triggerLoadDialog" class="bg-yellow-500 hover:bg-yellow-700 text-black py-1 px-2 text-sm rounded">
+          Load Layout
+        </button>
+        <!-- END: New Buttons -->
       </div>
     </header>
+
+    <!-- START: Hidden File Input -->
+    <input type="file" ref="fileInput" @change="handleFileLoad" accept=".json" style="display: none" />
+    <!-- END: Hidden File Input -->
 
     <div class="flex-grow relative vue-flow-container">
       <VueFlow
