@@ -77,3 +77,14 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* src/style.css */
+/* You might not even need this file if Tailwind's preflight/base handles everything
+   and App.vue sets up the body/html for full screen. */
+
+/* Minimal reset or global settings if needed */
+body {
+  margin: 0;
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif; /* Keep a base font */
+  /* background-color from App.vue's root div will take precedence for the app area */
+}
