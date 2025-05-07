@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType } from '@vue-flow/core' // MODIFIED: Imported MarkerType
-import type { Connection, Edge, Node } from '@vue-flow/core'
+import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType } from '@vue-flow/core'
+import type { Connection, Edge, Node } from '@vue-flow/core' // Ensure Connection is imported
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { Controls } from '@vue-flow/controls'
@@ -14,7 +14,6 @@ import ScenarioCardNode from './components/ScenarioCardNode.vue'
 const workspaceStore = useWorkspaceStore()
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore)
 
-// MODIFIED: Added getNodes and onNodeDragStop
 const { fitView, onPaneReady, getViewport, getNodes, onNodeDragStop } = useVueFlow()
 
 onPaneReady(async ({ fitView: fitViewInstance }) => {
@@ -36,15 +35,35 @@ const nodeTypes = computed(() => ({
   scenarioCard: markRaw(ScenarioCardNode),
 }))
 
-const onConnect = (params: Connection | Edge) => {
+const onConnect = (connectionParams: Connection) => {
+  // Log the raw parameters received from the connect event
+  console.log('Raw connectionParams from event:', JSON.parse(JSON.stringify(connectionParams)));
+  // connectionParams.source is the ID of the node Vue Flow considers the source (e.g., where a 'source' type handle is)
+  // connectionParams.target is the ID of the node Vue Flow considers the target (e.g., where a 'target' type handle is)
+
+  // If the user drags from visual A to visual B, but the types of handles cause Vue Flow
+  // to report source=B and target=A, then the arrow markerEnd (pointing to target)
+  // would point to A, which is the reverse of the drag gesture.
+
+  // To make the arrow ALWAYS follow the drag gesture:
+  // We assume the user *wants* the arrow to point from the node represented by connectionParams.target (from Vue Flow's perspective)
+  // to the node represented by connectionParams.source (from Vue Flow's perspective), if the arrow is currently reversed.
+  // This effectively means the edge's logical source should be what Vue Flow called 'target' in the event,
+  // and the edge's logical target should be what Vue Flow called 'source'.
+
   const newEdge: Edge = {
-    ...params,
-    id: `e${params.source}-${params.target}-${params.sourceHandle || 'node'}-${params.targetHandle || 'node'}-${Date.now()}`, // Using more descriptive ID
-    label: 'New Connection',
-    markerEnd: MarkerType.ArrowClosed, // MODIFIED: Added this line for arrowheads
-  }
-  edges.value = addEdgeHelper(newEdge, edges.value)
-  console.log('New connection made with arrowhead:', newEdge);
+    // Swapping source and target from the connectionParams
+    source: connectionParams.target!,       // This will be the tail of the arrow
+    target: connectionParams.source!,       // This will be the head of the arrow
+    sourceHandle: connectionParams.targetHandle || undefined, // Swap handles too
+    targetHandle: connectionParams.sourceHandle || undefined, // Swap handles too
+    id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgt'}-${connectionParams.sourceHandle || 'nodeSrc'}-${Date.now()}`,
+    label: 'Connection',
+    markerEnd: MarkerType.ArrowClosed, // Arrow head will point to the 'target' of this newEdge object
+  };
+
+  edges.value = addEdgeHelper(newEdge, edges.value);
+  console.log('Created Edge (source/target potentially swapped to match gesture):', JSON.parse(JSON.stringify(newEdge)));
 }
 
 const addNewNode = async () => {
@@ -115,20 +134,15 @@ const addNewNode = async () => {
   console.log('--- addNewNode END ---');
 };
 
-// ADDED: Handler for node drag stop
-onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) => { // Renamed to avoid conflict
+onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) => {
   console.log('Node Drag Stop Event:', {
     nodeId: draggedNodeInstance.id,
     newPosition: draggedNodeInstance.position,
   });
 
-  // Find the node in our Pinia store and update its position
-  // The `nodes` ref from storeToRefs is reactive and directly connected to the store's state.
   const storeNode = nodes.value.find(n => n.id === draggedNodeInstance.id);
   if (storeNode) {
-    // Directly update the position on the node object from the store's reactive list.
-    // Vue's reactivity should pick this up.
-    storeNode.position = { ...draggedNodeInstance.position }; // Create a new object for position
+    storeNode.position = { ...draggedNodeInstance.position };
     console.log(`Updated position for node ${draggedNodeInstance.id} in Pinia store (via reactive ref) to:`, JSON.parse(JSON.stringify(storeNode.position)));
   } else {
     console.warn(`Node ${draggedNodeInstance.id} not found in Pinia store (nodes.value) during onNodeDragStop.`);
@@ -198,17 +212,10 @@ onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) =
 
 .vue-flow__edge-path {
   stroke: #888;
-  stroke-width: 2; /* Optional: make the edge line a bit thicker */
+  stroke-width: 2;
 }
 .vue-flow__edge-text {
   fill: #ccc;
   font-size: 10px;
 }
-
-/* Style for the arrowhead if needed, though MarkerType.ArrowClosed usually works out of the box */
-/*
-.vue-flow__marker-arrowclosed path {
-  fill: #888;
-}
-*/
 </style>
