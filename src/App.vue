@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper } from '@vue-flow/core'
+import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType } from '@vue-flow/core' // MODIFIED: Imported MarkerType
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
@@ -39,11 +39,12 @@ const nodeTypes = computed(() => ({
 const onConnect = (params: Connection | Edge) => {
   const newEdge: Edge = {
     ...params,
-    id: `e${params.source}-${params.target}-${Date.now()}`,
-    label: 'New Connection'
+    id: `e${params.source}-${params.target}-${params.sourceHandle || 'node'}-${params.targetHandle || 'node'}-${Date.now()}`, // Using more descriptive ID
+    label: 'New Connection',
+    markerEnd: MarkerType.ArrowClosed, // MODIFIED: Added this line for arrowheads
   }
   edges.value = addEdgeHelper(newEdge, edges.value)
-  console.log('New connection made:', params);
+  console.log('New connection made with arrowhead:', newEdge);
 }
 
 const addNewNode = async () => {
@@ -197,9 +198,17 @@ onNodeDragStop(({ event, nodes: draggedNodesInfo, node: draggedNodeInstance }) =
 
 .vue-flow__edge-path {
   stroke: #888;
+  stroke-width: 2; /* Optional: make the edge line a bit thicker */
 }
 .vue-flow__edge-text {
   fill: #ccc;
   font-size: 10px;
 }
+
+/* Style for the arrowhead if needed, though MarkerType.ArrowClosed usually works out of the box */
+/*
+.vue-flow__marker-arrowclosed path {
+  fill: #888;
+}
+*/
 </style>

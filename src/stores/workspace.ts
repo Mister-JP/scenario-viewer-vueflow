@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { Node, Edge } from '@vue-flow/core'
+import { MarkerType } from '@vue-flow/core' // MODIFIED: Import MarkerType
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const hostUrl = ref<string>(localStorage.getItem('scenario-host') || 'http://localhost:8080')
@@ -20,7 +21,18 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     },
   ])
   const edges = ref<Edge[]>([
-    { id: 'e1-2', source: '1', target: '2', label: 'Leads to' },
+    {
+      id: 'e1-2',
+      source: '1',
+      target: '2',
+      label: 'Leads to',
+      markerEnd: MarkerType.ArrowClosed, // MODIFIED: Added for initial edge
+      // Optional: Specify source and target handles if this initial edge
+      // should connect to specific points rather than node centers/defaults.
+      // For example, if node '1' should connect from its right side to node '2's left side:
+      // sourceHandle: 'right-source',
+      // targetHandle: 'left-target',
+    },
   ])
 
   function updateHostUrl(newUrl: string) {
