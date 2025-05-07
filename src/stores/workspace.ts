@@ -9,13 +9,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     {
       id: '1',
       type: 'scenarioCard',
-      position: { x: 100, y: 100 }, // Slightly different initial positions
+      position: { x: 100, y: 100 },
       data: { scenarioId: 1 },
     },
     {
       id: '2',
       type: 'scenarioCard',
-      position: { x: 500, y: 250 }, // Spread them out a bit
+      position: { x: 500, y: 250 },
       data: { scenarioId: 2 },
     },
   ])
@@ -38,10 +38,25 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  function updateNodeScenarioId(nodeId: string, newScenarioId: number) {
+    const node = nodes.value.find(n => n.id === nodeId);
+    if (node && node.data) {
+      console.log(`Updating scenarioId for node ${nodeId} from ${node.data.scenarioId} to ${newScenarioId}`);
+      node.data.scenarioId = newScenarioId;
+      // Logging the state of the specific node's data after update
+      console.log(`Node ${nodeId} data after update:`, JSON.parse(JSON.stringify(node.data)));
+      // Logging the whole nodes array to verify the change within the array context
+      // console.log('Full nodes array after update:', JSON.parse(JSON.stringify(nodes.value)));
+    } else {
+      console.error(`Node with id ${nodeId} not found or has no data object.`);
+    }
+  }
+
   return {
     hostUrl,
     nodes,
     edges,
     updateHostUrl,
+    updateNodeScenarioId,
   }
 })

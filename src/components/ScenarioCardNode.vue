@@ -8,6 +8,7 @@ const props = defineProps<NodeProps>()
 const store = useWorkspaceStore()
 
 const iframeSrc = computed(() => {
+  console.log(`ScenarioCardNode (${props.id}): iframeSrc computed. scenarioId: ${props.data?.scenarioId}, hostUrl: ${store.hostUrl}`);
   if (props.data && typeof props.data.scenarioId === 'number') {
     const baseUrl = store.hostUrl.replace(/\/$/, '');
     return `${baseUrl}?scenario=${props.data.scenarioId}`;
@@ -17,15 +18,37 @@ const iframeSrc = computed(() => {
 
 const cardLabel = computed(() => props.label || `Scenario ${props.data?.scenarioId || props.id}`)
 
+const editScenarioId = () => {
+  const currentId = props.data?.scenarioId;
+  const newIdString = prompt(`Enter new Scenario ID for node "${props.id}":`, currentId !== undefined ? String(currentId) : '');
+
+  if (newIdString !== null) {
+    const newId = parseInt(newIdString, 10);
+    if (!isNaN(newId) && newId > 0) {
+      store.updateNodeScenarioId(props.id, newId);
+    } else {
+      alert('Invalid Scenario ID. Please enter a positive number.');
+    }
+  }
+}
+
 </script>
 
 <template>
   <div class="scenario-card bg-gray-700 border border-gray-600 rounded-lg shadow-lg flex flex-col overflow-hidden w-[350px] h-[250px]">
-    <div class="card-header bg-gray-800 text-white p-2 text-sm font-semibold border-b border-gray-600 cursor-move">
-      {{ cardLabel }}
+    <div class="card-header bg-gray-800 text-white p-2 text-sm font-semibold border-b border-gray-600 cursor-move flex justify-between items-center">
+      <span>{{ cardLabel }}</span>
+      <button
+        @click.stop="editScenarioId"
+        title="Edit Scenario ID"
+        class="edit-scenario-btn p-1 rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
+      >
+        ✏️
+      </button>
     </div>
     <div class="card-content flex-grow overflow-hidden">
       <iframe
+        :key="`iframe-${props.id}-${props.data?.scenarioId}`" <!-- MODIFIED: Added more specific key -->
         :src="iframeSrc"
         frameborder="0"
         class="w-full h-full"
@@ -58,8 +81,13 @@ const cardLabel = computed(() => props.label || `Scenario ${props.data?.scenario
   user-select: none;
 }
 
+.edit-scenario-btn {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
 .custom-handle {
-  @apply w-3 h-3 bg-amber-400 rounded-full border-2 border-gray-800; /* Matched border to card header */
+  @apply w-3 h-3 bg-amber-400 rounded-full border-2 border-gray-800;
   opacity: 0;
   transition: opacity 0.2s;
   z-index: 10;
