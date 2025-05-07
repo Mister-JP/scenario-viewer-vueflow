@@ -47,14 +47,15 @@ const editScenarioId = () => {
       </button>
     </div>
     <div class="card-content flex-grow overflow-hidden">
-      <iframe
-        :key="`iframe-${props.id}-${props.data?.scenarioId}`" <!-- MODIFIED: Added more specific key -->
+      <!-- MODIFIED: Added more specific key for the iframe below -->
+        <iframe
+        :key="`iframe-${props.id}-${props.data?.scenarioId}`"
         :src="iframeSrc"
         frameborder="0"
         class="w-full h-full"
         :title="`Scenario ${props.data?.scenarioId}`"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      ></iframe>
+        ></iframe>
     </div>
 
     <!-- Connection Handles -->
