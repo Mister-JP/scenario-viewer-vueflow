@@ -6,7 +6,7 @@ import { MiniMap } from '@vue-flow/minimap'
 import { Controls } from '@vue-flow/controls'
 import { storeToRefs } from 'pinia'
 import { useWorkspaceStore } from './stores/workspace'
-import { computed, markRaw } from 'vue' // <-- IMPORTED markRaw
+import { computed, markRaw, nextTick } from 'vue' // Added nextTick
 
 // Import your custom node
 import ScenarioCardNode from './components/ScenarioCardNode.vue'
@@ -14,16 +14,29 @@ import ScenarioCardNode from './components/ScenarioCardNode.vue'
 const workspaceStore = useWorkspaceStore()
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore)
 
-const { fitView, onPaneReady } = useVueFlow()
+const { fitView, onPaneReady, getViewport } = useVueFlow() // Added getViewport for debugging if needed
 
-onPaneReady(({ fitView: fitViewInstance }) => {
-  console.log('Vue Flow Pane is ready, fitting view.');
-  fitViewInstance();
+onPaneReady(async ({ fitView: fitViewInstance }) => {
+  console.log('Vue Flow Pane is ready.');
+  console.log('Viewport BEFORE fitView:', getViewport());
+
+  // Wait for the next DOM update cycle just in case dimensions are still settling
+  await nextTick();
+
+  // Optional: A minimal timeout if nextTick alone isn't enough
+  setTimeout(() => {
+    console.log('Fitting view with padding after slight delay.');
+    fitViewInstance({ padding: 0.1 }); // Apply padding
+    // For debugging, log viewport shortly after fitView attempts to apply
+    setTimeout(() => {
+      console.log('Viewport AFTER fitView attempt:', getViewport());
+    }, 50)
+  }, 50); // Small delay, e.g., 50ms. Start small, increase if needed.
 });
 
 // Define custom node types, marking the component as raw
 const nodeTypes = computed(() => ({
-  scenarioCard: markRaw(ScenarioCardNode), // <-- USED markRaw
+  scenarioCard: markRaw(ScenarioCardNode),
 }))
 
 const onConnect = (params: Connection | Edge) => {
@@ -41,7 +54,7 @@ const addNewNode = () => {
   const newNode: Node = {
     id: newNodeId,
     type: 'scenarioCard',
-    label: `Scenario ${nodes.value.length + 1}`, // This can be used by the custom node if needed
+    label: `Scenario ${nodes.value.length + 1}`,
     position: { x: Math.random() * 400 + 50, y: Math.random() * 300 + 50 },
     data: { scenarioId: nodes.value.length + 1 }
   };
@@ -62,7 +75,7 @@ const addNewNode = () => {
         <button @click="addNewNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-sm rounded">
           Add Node
         </button>
-        <button @click="fitView()" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-sm rounded">
+        <button @click="fitView({ padding: 0.1 })" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-sm rounded">
           Fit View
         </button>
       </div>
@@ -98,30 +111,17 @@ const addNewNode = () => {
 .vue-flow-container {
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Prevents scrollbars on this div if content overflows slightly */
+  overflow: hidden; 
 }
 
 .vue-flow__minimap {
   transform: scale(0.75);
   transform-origin: bottom right;
-  background-color: rgba(40, 40, 40, 0.8); /* Darker minimap background */
+  background-color: rgba(40, 40, 40, 0.8);
   border-radius: 4px;
 }
 
-.vue-flow__controls {
-  /* You can style controls if needed */
-}
-
-/* If you are exclusively using custom nodes, you might not need these default styles.
-   However, they are harmless if `type: 'scenarioCard'` is always used for your main nodes.
-*/
-.vue-flow__node-default {
-  @apply bg-gray-700 border-gray-500 text-white rounded-lg shadow-xl;
-  padding: 8px 12px;
-  font-size: 12px;
-}
-
-.vue-flow__node-input { /* For type: 'input' in initial store nodes */
+.vue-flow__node-input { /* For type: 'input' in initial store nodes, if any */
  @apply bg-blue-700 border-blue-500 text-white rounded-lg shadow-xl;
   padding: 8px 12px;
   font-size: 12px;

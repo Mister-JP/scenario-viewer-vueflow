@@ -8,17 +8,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const nodes = ref<Node[]>([
     {
       id: '1',
-      type: 'scenarioCard', // Ensure this is the custom type
-      position: { x: 50, y: 50 },
+      type: 'scenarioCard',
+      position: { x: 100, y: 100 }, // Slightly different initial positions
       data: { scenarioId: 1 },
-      // label: 'Scenario 1' // Optional: label can be derived in custom node
     },
     {
       id: '2',
-      type: 'scenarioCard', // Ensure this is the custom type
-      position: { x: 450, y: 150 },
+      type: 'scenarioCard',
+      position: { x: 500, y: 250 }, // Spread them out a bit
       data: { scenarioId: 2 },
-      // label: 'Scenario 2'
     },
   ])
   const edges = ref<Edge[]>([
@@ -40,20 +38,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  // Placeholder for future actions
-  // function addNode(node: Node) {
-  //   nodes.value.push(node)
-  // }
-  // function addEdge(edge: Edge) {
-  //   edges.value.push(edge)
-  // }
-
   return {
     hostUrl,
     nodes,
     edges,
     updateHostUrl,
-    // addNode,
-    // addEdge
   }
 })
