@@ -47,7 +47,6 @@ const editScenarioId = () => {
       </button>
     </div>
     <div class="card-content flex-grow overflow-hidden">
-      <!-- MODIFIED: Added more specific key for the iframe below -->
         <iframe
         :key="`iframe-${props.id}-${props.data?.scenarioId}`"
         :src="iframeSrc"
@@ -58,18 +57,18 @@ const editScenarioId = () => {
         ></iframe>
     </div>
 
-    <!-- Connection Handles -->
-    <Handle type="source" :position="Position.Top" class="custom-handle" :style="{ top: '-5px' }" />
-    <Handle type="target" :position="Position.Top" class="custom-handle custom-handle-target" :style="{ top: '-5px' }" />
+    <!-- Connection Handles with unique IDs -->
+    <Handle id="top-source" type="source" :position="Position.Top" class="custom-handle" :style="{ top: '-5px' }" />
+    <Handle id="top-target" type="target" :position="Position.Top" class="custom-handle custom-handle-target" :style="{ top: '-5px' }" />
 
-    <Handle type="source" :position="Position.Right" class="custom-handle" :style="{ right: '-5px' }" />
-    <Handle type="target" :position="Position.Right" class="custom-handle custom-handle-target" :style="{ right: '-5px' }" />
+    <Handle id="right-source" type="source" :position="Position.Right" class="custom-handle" :style="{ right: '-5px' }" />
+    <Handle id="right-target" type="target" :position="Position.Right" class="custom-handle custom-handle-target" :style="{ right: '-5px' }" />
 
-    <Handle type="source" :position="Position.Bottom" class="custom-handle" :style="{ bottom: '-5px' }" />
-    <Handle type="target" :position="Position.Bottom" class="custom-handle custom-handle-target" :style="{ bottom: '-5px' }" />
+    <Handle id="bottom-source" type="source" :position="Position.Bottom" class="custom-handle" :style="{ bottom: '-5px' }" />
+    <Handle id="bottom-target" type="target" :position="Position.Bottom" class="custom-handle custom-handle-target" :style="{ bottom: '-5px' }" />
 
-    <Handle type="source" :position="Position.Left" class="custom-handle" :style="{ left: '-5px' }" />
-    <Handle type="target" :position="Position.Left" class="custom-handle custom-handle-target" :style="{ left: '-5px' }" />
+    <Handle id="left-source" type="source" :position="Position.Left" class="custom-handle" :style="{ left: '-5px' }" />
+    <Handle id="left-target" type="target" :position="Position.Left" class="custom-handle custom-handle-target" :style="{ left: '-5px' }" />
   </div>
 </template>
 
@@ -102,4 +101,8 @@ const editScenarioId = () => {
   @apply bg-sky-500;
   opacity: 1 !important;
 }
+/* Optional: Add specific styles for target handles if needed, e.g., for debugging */
+/* .custom-handle-target { */
+  /* Example: outline: 1px dashed blue; */
+/* } */
 </style>
