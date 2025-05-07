@@ -55,3 +55,36 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 */
+
+.vue-flow__edge-text {
+  fill: #eee; /* Light text color for dark background */
+  font-size: 11px;
+  opacity: 0; /* Hidden by default */
+  pointer-events: none; /* Not interactive when hidden */
+  transition: opacity 0.2s ease-in-out;
+  text-anchor: middle; /* Center the text on its x,y position */
+}
+
+.vue-flow__edge:hover .vue-flow__edge-text {
+  opacity: 1;
+  pointer-events: auto; /* Interactive when visible */
+  cursor: pointer; /* Indicate it's clickable/editable */
+}
+
+/* Optional: Add a very subtle background for better readability and click target */
+.vue-flow__edge-text-bg {
+  fill: rgba(50, 50, 50, 0.7); /* Semi-transparent background */
+  /* Vue Flow usually handles the x, y, width, height of this bg rect automatically if you use the textBg options */
+}
+
+/* Make the edge path itself a bit thicker to make hovering/clicking easier */
+.vue-flow__edge-path {
+  stroke: #888;
+  stroke-width: 2.5; /* Slightly thicker */
+  transition: stroke-width 0.1s ease-in-out, stroke 0.1s ease-in-out;
+}
+
+.vue-flow__edge:hover .vue-flow__edge-path {
+  stroke: #aaa; /* Lighten path on hover */
+  stroke-width: 3;
+}
