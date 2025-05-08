@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position, type NodeProps } from '@vue-flow/core'
-import { ref, computed, onBeforeUnmount, watch, toRaw, onMounted, nextTick } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue' // TS6133: Removed toRaw, onMounted, nextTick
 import { useWorkspaceStore } from '../stores/workspace'
 import MarkdownLabel from './MarkdownLabel.vue'
 import EditMarkdownNodeModal from './EditMarkdownNodeModal.vue'
@@ -10,22 +10,18 @@ const store = useWorkspaceStore()
 
 console.log(`[MarkdownNode ${props.id}] Initializing. Initial props.data:`, JSON.parse(JSON.stringify(props.data)));
 
-// Local reactive state for the markdown content within this node instance
 const localMarkdownContent = ref(props.data?.markdownContent || '');
 
-// Watch for external changes to props.data.markdownContent (e.g., from loading a layout)
-// and update the local state if it's different.
 watch(() => props.data?.markdownContent, (newContentFromProps) => {
   console.log(`[MarkdownNode ${props.id}] props.data.markdownContent externally changed to: "${newContentFromProps?.substring(0,30)}..."`);
   if (newContentFromProps !== undefined && newContentFromProps !== localMarkdownContent.value) {
     console.log(`[MarkdownNode ${props.id}] Updating localMarkdownContent from props.`);
     localMarkdownContent.value = newContentFromProps;
   }
-}, { immediate: false }); // Don't run immediately, let initial value be set by ref()
+}, { immediate: false });
 
 const showEditModal = ref(false)
 
-// --- Sizing and Resizing Logic ---
 const nodeRef = ref<HTMLDivElement | null>(null);
 const isResizing = ref(false);
 const resizeStartX = ref(0);
@@ -40,18 +36,20 @@ const storeNode = computed(() => store.nodes.find(n => n.id === props.id));
 
 const reactiveWidth = computed(() => {
   const sNode = storeNode.value;
-  if (sNode?.style?.width) {
-    return parseFloat(sNode.style.width);
+  if (sNode?.style && typeof sNode.style === 'object' && 'width' in sNode.style) {
+    const widthValue = (sNode.style as { width?: string }).width; // TS2339 fix
+    if (widthValue) return parseFloat(widthValue);
   }
-  return sNode?.data?.width || 250;
+  return sNode?.data?.width || 250; // Fallback from props.data or default
 });
 
 const reactiveHeight = computed(() => {
   const sNode = storeNode.value;
-  if (sNode?.style?.height) {
-    return parseFloat(sNode.style.height);
+  if (sNode?.style && typeof sNode.style === 'object' && 'height' in sNode.style) {
+    const heightValue = (sNode.style as { height?: string }).height; // TS2339 fix
+    if (heightValue) return parseFloat(heightValue);
   }
-  return sNode?.data?.height || 180;
+  return sNode?.data?.height || 180; // Fallback from props.data or default
 });
 
 const nodeStyle = computed(() => ({
@@ -94,7 +92,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', handleResizeMouseUp);
 });
 
-// --- Modal Logic ---
 const handleDoubleClick = () => {
   console.log(`[MarkdownNode ${props.id}] Double clicked. Opening modal. Current localMarkdownContent: "${localMarkdownContent.value.substring(0,30)}..."`);
   showEditModal.value = true;
@@ -102,10 +99,9 @@ const handleDoubleClick = () => {
 
 const handleSaveMarkdown = (newContent: string) => {
   console.log(`[MarkdownNode ${props.id}] handleSaveMarkdown called. New content for local: "${newContent.substring(0,30)}..."`);
-  localMarkdownContent.value = newContent; // Update local state FIRST
+  localMarkdownContent.value = newContent;
   console.log(`[MarkdownNode ${props.id}] localMarkdownContent is now: "${localMarkdownContent.value.substring(0,30)}..."`);
   
-  // Now, tell the store to update its version.
   store.updateNodeData(props.id, { markdownContent: newContent });
   console.log(`[MarkdownNode ${props.id}] Called store.updateNodeData.`);
   
@@ -117,7 +113,6 @@ const handleCancelEdit = () => {
   showEditModal.value = false;
 }
 
-// For the modal, pass the localMarkdownContent
 const initialModalValue = computed(() => localMarkdownContent.value);
 
 </script>
@@ -134,7 +129,6 @@ const initialModalValue = computed(() => localMarkdownContent.value);
       Local: {{ localMarkdownContent?.substring(0,15) }}...
     </div>
 
-    <!-- Bind to localMarkdownContent -->
     <MarkdownLabel
       :label="localMarkdownContent" 
       class="markdown-label-component"

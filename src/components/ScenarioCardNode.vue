@@ -6,7 +6,6 @@ import { useWorkspaceStore } from '../stores/workspace'
 const props = defineProps<NodeProps>()
 const store = useWorkspaceStore()
 
-// --- Sizing and Resizing Logic ---
 const nodeRef = ref<HTMLDivElement | null>(null);
 const isResizing = ref(false);
 const resizeStartX = ref(0);
@@ -21,18 +20,20 @@ const storeNode = computed(() => store.nodes.find(n => n.id === props.id));
 
 const reactiveWidth = computed(() => {
   const sNode = storeNode.value;
-  if (sNode?.style?.width) {
-    return parseFloat(sNode.style.width);
+  if (sNode?.style && typeof sNode.style === 'object' && 'width' in sNode.style) {
+    const widthValue = (sNode.style as { width?: string }).width; // TS2339 fix
+    if (widthValue) return parseFloat(widthValue);
   }
-  return 350;
+  return 350; // Default width if not set in style
 });
 
 const reactiveHeight = computed(() => {
   const sNode = storeNode.value;
-  if (sNode?.style?.height) {
-    return parseFloat(sNode.style.height);
+  if (sNode?.style && typeof sNode.style === 'object' && 'height' in sNode.style) {
+    const heightValue = (sNode.style as { height?: string }).height; // TS2339 fix
+    if (heightValue) return parseFloat(heightValue);
   }
-  return 250;
+  return 250; // Default height if not set in style
 });
 
 const nodeStyle = computed(() => ({

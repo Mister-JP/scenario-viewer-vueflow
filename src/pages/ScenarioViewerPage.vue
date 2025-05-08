@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node, type EdgeDoubleClickEvent } from '@vue-flow/core';
+import { VueFlow, useVueFlow, addEdge, MarkerType, type Connection, type Edge, type Node, type EdgeMouseEvent } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { MiniMap } from '@vue-flow/minimap';
 import { Controls } from '@vue-flow/controls';
@@ -13,7 +13,6 @@ import MarkdownNode from '../components/MarkdownNode.vue';
 const workspaceStore = useWorkspaceStore();
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore);
 
-// Re-define AppNode type or import from store if you made it exportable
 interface ScenarioNodeData {
   scenarioId: string;
   [key: string]: any;
@@ -52,10 +51,11 @@ const onConnect = (connectionParams: Connection) => {
     label: '',
     markerEnd: MarkerType.ArrowClosed,
   };
-  edges.value = addEdgeHelper(newEdge, edges.value);
+  // Apply a type assertion here
+  edges.value = addEdge(newEdge, edges.value) as Edge[]; // <--- MODIFIED LINE
 };
 
-const handleEdgeDoubleClick = (event: EdgeDoubleClickEvent) => {
+const handleEdgeDoubleClick = (event: EdgeMouseEvent) => {
   const edgeToRemove = event.edge;
   if (edgeToRemove) {
     if (window.confirm(`Are you sure you want to delete the connection from "${edgeToRemove.source}" to "${edgeToRemove.target}"?`)) {
@@ -173,17 +173,22 @@ const handleFileLoad = async (event: Event) => {
           Array.isArray(loadedData.edges)
         ) {
           workspaceStore.updateHostUrl(loadedData.hostUrl);
-          nodes.value = loadedData.nodes.map((n: any) => ({
+          
+          nodes.value = loadedData.nodes.map((n: any): Node => ({
             ...n,
             position: { x: n.position?.x || 0, y: n.position?.y || 0 },
-            data: n.data ? { ...n.data, scenarioId: n.data.scenarioId !== undefined ? String(n.data.scenarioId) : undefined } : undefined,
+            data: n.data ? { ...n.data, scenarioId: n.data.scenarioId !== undefined ? String(n.data.scenarioId) : undefined } : {},
             style: n.style ? { ...n.style } : undefined,
+            type: n.type || (n.data?.scenarioId ? 'scenarioCard' : (n.data?.markdownContent ? 'markdownNode' : undefined)),
+            label: n.label || (n.data?.scenarioId ? `Scenario: ${n.data.scenarioId}`: undefined)
           }));
-          edges.value = loadedData.edges.map((edge: any) => ({
+
+          edges.value = loadedData.edges.map((edge: any): Edge => ({
             ...edge,
             markerEnd: edge.markerEnd || MarkerType.ArrowClosed,
             label: edge.label || '',
           }));
+
           await nextTick();
           fitView({ padding: 0.1 });
           alert('Layout loaded successfully!');

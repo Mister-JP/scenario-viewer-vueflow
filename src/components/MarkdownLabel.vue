@@ -10,7 +10,7 @@ marked.setOptions({
   gfm: true,
   breaks: false, // Using false is a common default
   pedantic: false,
-  smartypants: true
+//   smartypants: true
 });
 
 const renderedMarkdown = computed(() => {
