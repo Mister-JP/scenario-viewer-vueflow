@@ -5,13 +5,19 @@ import { MiniMap } from '@vue-flow/minimap';
 import { Controls } from '@vue-flow/controls';
 import { storeToRefs } from 'pinia';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useAuthStore } from '../stores/auth'; // Import auth store
 import { computed, markRaw, nextTick, ref as vueRef } from 'vue';
 
 import ScenarioCardNode from '../components/ScenarioCardNode.vue';
 import MarkdownNode from '../components/MarkdownNode.vue';
 
+// Workspace Store
 const workspaceStore = useWorkspaceStore();
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore);
+
+// Auth Store
+const authStore = useAuthStore();
+const { isAuthenticated, user: loggedInUser } = storeToRefs(authStore); // Using storeToRefs for reactive access
 
 interface ScenarioNodeData {
   scenarioId: string;
@@ -43,16 +49,15 @@ const nodeTypes = computed(() => ({
 
 const onConnect = (connectionParams: Connection) => {
   const newEdge: Edge = {
-    source: connectionParams.target!,
-    target: connectionParams.source!,
+    source: connectionParams.target!, // Reversed for intuitive drawing
+    target: connectionParams.source!, // Reversed for intuitive drawing
     sourceHandle: connectionParams.targetHandle || undefined,
     targetHandle: connectionParams.sourceHandle || undefined,
     id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgtH'}-${connectionParams.sourceHandle || 'nodeSrcH'}-${Date.now()}`,
     label: '',
     markerEnd: MarkerType.ArrowClosed,
   };
-  // Apply a type assertion here
-  edges.value = addEdge(newEdge, edges.value) as Edge[]; // <--- MODIFIED LINE
+  edges.value = addEdge(newEdge, edges.value) as Edge[];
 };
 
 const handleEdgeDoubleClick = (event: EdgeMouseEvent) => {
@@ -67,7 +72,9 @@ const handleEdgeDoubleClick = (event: EdgeMouseEvent) => {
 const handleEditHostUrl = () => {
   const currentHost = hostUrl.value || 'http://localhost:8080';
   const newUrl = window.prompt('Enter new host URL:', currentHost);
-  workspaceStore.updateHostUrl(newUrl || currentHost);
+  if (newUrl !== null) { // Check if user didn't cancel prompt
+    workspaceStore.updateHostUrl(newUrl);
+  }
 };
 
 const addNewScenarioNode = async () => {
@@ -75,6 +82,8 @@ const addNewScenarioNode = async () => {
   const newNodeId = `scn-${existingScenarioNodesCount + 1}-${Date.now()}`;
   
   let scenarioIdentifier = window.prompt("Enter a Scenario ID (e.g., file name, descriptive_id):", `new-scenario-${existingScenarioNodesCount + 1}`);
+  if (scenarioIdentifier === null) return; // User cancelled
+
   if (!scenarioIdentifier || scenarioIdentifier.trim() === "") {
     scenarioIdentifier = `scenario_${Date.now()}`; 
   } else {
@@ -210,32 +219,53 @@ const handleFileLoad = async (event: Event) => {
   }
 };
 
+const handleLogout = () => {
+  authStore.logout();
+};
+
 </script>
 
 <template>
   <div class="w-screen h-screen flex flex-col bg-gray-800">
     <header class="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center flex-shrink-0">
       <h1 class="text-lg font-semibold">Scenario Viewer</h1>
-      <div class="flex items-center space-x-2">
-        <span class="text-sm">Host: {{ hostUrl }}</span>
-        <button @click="handleEditHostUrl" class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 text-sm rounded">
-          Edit Host
-        </button>
-        <button @click="addNewScenarioNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-sm rounded">
-          Add Scenario Node
-        </button>
-        <button @click="addMarkdownNode" class="bg-teal-500 hover:bg-teal-700 text-white py-1 px-2 text-sm rounded">
-          Add Markdown Note
-        </button>
-        <button @click="fitView({ padding: 0.1 })" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-sm rounded">
-          Fit View
-        </button>
-        <button @click="saveLayout" class="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 text-sm rounded">
-          Save Layout
-        </button>
-        <button @click="triggerLoadDialog" class="bg-yellow-500 hover:bg-yellow-700 text-black py-1 px-2 text-sm rounded">
-          Load Layout
-        </button>
+      <div class="flex items-center space-x-3"> <!-- Increased space-x for better separation -->
+        <!-- User Info and Logout Button -->
+        <div v-if="isAuthenticated && loggedInUser" class="flex items-center space-x-2">
+          <span class="text-sm">
+            Hi, {{ loggedInUser.username }}
+          </span>
+          <button
+            @click="handleLogout"
+            class="bg-red-500 hover:bg-red-700 text-white py-1 px-2 text-xs rounded font-medium" 
+            title="Logout"
+          >
+            Logout
+          </button>
+        </div>
+        <!-- End User Info and Logout Button -->
+
+        <div class="flex items-center space-x-2"> <!-- Group for other controls -->
+            <span class="text-sm">Host: {{ hostUrl }}</span>
+            <button @click="handleEditHostUrl" class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 text-xs rounded font-medium">
+            Edit Host
+            </button>
+            <button @click="addNewScenarioNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-xs rounded font-medium">
+            Add Scenario
+            </button>
+            <button @click="addMarkdownNode" class="bg-teal-500 hover:bg-teal-700 text-white py-1 px-2 text-xs rounded font-medium">
+            Add Note
+            </button>
+            <button @click="fitView({ padding: 0.1 })" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-xs rounded font-medium">
+            Fit View
+            </button>
+            <button @click="saveLayout" class="bg-purple-500 hover:bg-purple-700 text-white py-1 px-2 text-xs rounded font-medium">
+            Save Layout
+            </button>
+            <button @click="triggerLoadDialog" class="bg-yellow-500 hover:bg-yellow-700 text-black py-1 px-2 text-xs rounded font-medium">
+            Load Layout
+            </button>
+        </div>
       </div>
     </header>
 
@@ -263,6 +293,7 @@ const handleFileLoad = async (event: Event) => {
 </template>
 
 <style>
+/* Styles should be in a separate file or scoped, but for completeness if they were here: */
 .vue-flow-container {
   width: 100%;
   height: 100%;
@@ -274,11 +305,7 @@ const handleFileLoad = async (event: Event) => {
   background-color: rgba(40, 40, 40, 0.8);
   border-radius: 4px;
 }
-.vue-flow__node-input {
- @apply bg-blue-700 border-blue-500 text-white rounded-lg shadow-xl;
-  padding: 8px 12px;
-  font-size: 12px;
-}
+/* Tailwind classes are preferred over .vue-flow__node-input */
 .vue-flow__edge-path {
   stroke: #888;
   stroke-width: 2.5;
