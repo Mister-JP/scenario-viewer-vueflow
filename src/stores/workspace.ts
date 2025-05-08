@@ -27,9 +27,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       position: { x: 50, y: 400 },
       data: {
         markdownContent: "## Welcome!\n\nThis is a **Markdown Note**.\n\n- Double-click to edit.\n- Resize me using the handle at the bottom-right.",
+        // width: 280, // Store raw numbers in data if preferred for persistence
+        // height: 200
       },
-      style: { width: '280px', height: '200px' }, // Initial dimensions
-      // label: 'My First Note' // Optional: for display in devtools or if you add a header
+      style: { width: '280px', height: '200px' }, // Vue Flow uses style for rendering dimensions
+      // label: 'My First Note'
     },
   ])
   const edges = ref<Edge[]>([
@@ -37,7 +39,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       id: 'e-scn1-scn2',
       source: 'scn-1',
       target: 'scn-2',
-      label: '', // No label on connections anymore
+      label: '',
       markerEnd: MarkerType.ArrowClosed,
     },
   ])
@@ -75,28 +77,35 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  // Specific for MarkdownNode content, or use generic updateNodeData
-  // function updateNodeMarkdownContent(nodeId: string, markdownContent: string) {
-  //   const node = nodes.value.find(n => n.id === nodeId);
-  //   if (node && node.type === 'markdownNode') {
-  //     if (!node.data) node.data = {};
-  //     node.data.markdownContent = markdownContent;
-  //   }
-  // }
-
   function updateNodeDimensions(nodeId: string, width: number, height: number) {
-    const node = nodes.value.find(n => n.id === nodeId);
-    if (node) {
-      // Ensure style object exists
-      if (!node.style) node.style = {};
-      node.style.width = `${width}px`;
-      node.style.height = `${height}px`;
-      // Optionally, store raw numbers in data if needed for persistence or logic,
-      // but Vue Flow primarily uses node.style for rendering dimensions.
-      // if (!node.data) node.data = {};
-      // node.data.width = width;
-      // node.data.height = height;
-      console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`);
+    const nodeIndex = nodes.value.findIndex(n => n.id === nodeId);
+    if (nodeIndex !== -1) {
+      const nodeToUpdate = nodes.value[nodeIndex];
+
+      // Create a new style object to help ensure reactivity
+      const newStyle = {
+        ...nodeToUpdate.style, // Spread existing styles to preserve any other style properties
+        width: `${width}px`,
+        height: `${height}px`,
+      };
+
+      // Update the node in the array by creating a new node object with the new style.
+      // This often helps trigger reactivity more reliably in lists.
+      nodes.value[nodeIndex] = {
+        ...nodeToUpdate, // Spread all existing properties of the node
+        style: newStyle,   // Assign the new style object
+        // data: { // If you also store width/height in data, update it here
+        //   ...nodeToUpdate.data,
+        //   width: width,
+        //   height: height,
+        // }
+      };
+
+      // Alternative: Just update the style property reference if the above is too much
+      // nodeToUpdate.style = newStyle;
+      // Vue.set(nodes.value, nodeIndex, nodeToUpdate); // For Vue 2 style reactivity if needed, but usually not for Vue 3 with ref arrays.
+
+      console.log(`Updated dimensions for node ${nodeId}: ${width}x${height} (store updated with new style object)`);
     } else {
       console.error(`Node with id ${nodeId} not found for dimension update.`);
     }
@@ -109,8 +118,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     edges,
     updateHostUrl,
     updateNodeScenarioId,
-    updateNodeData, // Export generic updater
-    // updateNodeMarkdownContent,
+    updateNodeData,
     updateNodeDimensions,
   }
 })
