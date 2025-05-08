@@ -111,14 +111,11 @@ const handleCancelEdit = () => {
   <div
     ref="nodeRef"
     class="markdown-node-wrapper"
-    :style="nodeStyle" 
+    :style="nodeStyle"
     @dblclick.stop="handleDoubleClick"
     @mousedown.left="handleResizeMouseDown"
   >
-    <!-- TEMPORARY DEBUGGING: -->
-    <pre style="position: absolute; top: 0; left: 0; color: yellow; font-size: 10px; z-index: 1000; background: rgba(0,0,0,0.5); padding: 2px; border-radius: 3px; pointer-events: none;">
-      {{ nodeStyle }}
-    </pre>
+    <!-- TEMPORARY DEBUGGING REMOVED -->
 
     <MarkdownLabel
       :label="markdownContent"
