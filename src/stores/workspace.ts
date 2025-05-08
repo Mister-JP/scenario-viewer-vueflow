@@ -1,26 +1,45 @@
 // src/stores/workspace.ts
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { Node, Edge } from '@vue-flow/core' // Edge type is already imported
+import type { Node, Edge } from '@vue-flow/core'
 import { MarkerType } from '@vue-flow/core'
+
+// Define a more specific type for ScenarioNode data if you want better type safety
+interface ScenarioNodeData {
+  scenarioId: string; // Changed from number to string
+  [key: string]: any; // Allow other properties
+}
+
+interface MarkdownNodeData {
+  markdownContent: string;
+  [key: string]: any; // Allow other properties
+}
+
+// Update Node type to be more specific about its data payload
+type AppNode = Omit<Node, 'data'> & {
+  data?: ScenarioNodeData | MarkdownNodeData | Record<string, any>;
+};
+
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const hostUrl = ref<string>(localStorage.getItem('scenario-host') || 'http://localhost:8080')
-  const nodes = ref<Node[]>([
+  
+  // Use the AppNode type here
+  const nodes = ref<AppNode[]>([
     {
       id: 'scn-1',
       type: 'scenarioCard',
       position: { x: 50, y: 100 },
-      data: { scenarioId: 1 },
-      label: 'Scenario 1',
+      data: { scenarioId: "default-scenario-1" }, // Changed to string
+      label: 'Scenario: default-scenario-1', // Update label to reflect change if desired
       style: { width: '350px', height: '250px' },
     },
     {
       id: 'scn-2',
       type: 'scenarioCard',
       position: { x: 450, y: 100 },
-      data: { scenarioId: 2 },
-      label: 'Scenario 2',
+      data: { scenarioId: "another-example.file" }, // Changed to string
+      label: 'Scenario: another-example.file', // Update label
       style: { width: '350px', height: '250px' },
     },
     {
@@ -58,10 +77,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  function updateNodeScenarioId(nodeId: string, newScenarioId: number) {
+  // Updated function signature and logic
+  function updateNodeScenarioId(nodeId: string, newScenarioId: string) {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node && node.data && node.type === 'scenarioCard') {
-      node.data.scenarioId = newScenarioId;
+      // Ensure data is treated as ScenarioNodeData for type safety, if you defined it
+      (node.data as ScenarioNodeData).scenarioId = newScenarioId;
+      // Optionally update the node's main label if it's derived from scenarioId
+      node.label = `Scenario: ${newScenarioId}`;
     }
   }
 
@@ -69,7 +92,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node) {
       node.data = { ...node.data, ...newData };
-      // console.log(`Updated data for node ${nodeId}:`, JSON.parse(JSON.stringify(node.data)));
     } else {
       console.error(`Node with id ${nodeId} not found for data update.`);
     }
@@ -88,18 +110,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         ...nodeToUpdate,
         style: newStyle,
       };
-      // console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`);
     } else {
       console.error(`Node with id ${nodeId} not found for dimension update.`);
     }
   }
 
-  // --- NEW FUNCTION TO REMOVE AN EDGE ---
   function removeEdge(edgeIdToRemove: string) {
     edges.value = edges.value.filter(edge => edge.id !== edgeIdToRemove);
     console.log(`Removed edge: ${edgeIdToRemove}`);
   }
-  // --- END NEW FUNCTION ---
 
   return {
     hostUrl,
@@ -109,6 +128,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     updateNodeScenarioId,
     updateNodeData,
     updateNodeDimensions,
-    removeEdge, // Expose the new function
+    removeEdge,
   }
 })

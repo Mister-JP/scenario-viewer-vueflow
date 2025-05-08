@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Ensure EdgeDoubleClickEvent is imported
 import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node, type EdgeDoubleClickEvent } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { MiniMap } from '@vue-flow/minimap';
@@ -8,12 +7,25 @@ import { storeToRefs } from 'pinia';
 import { useWorkspaceStore } from '../stores/workspace';
 import { computed, markRaw, nextTick, ref as vueRef } from 'vue';
 
-// Import components
 import ScenarioCardNode from '../components/ScenarioCardNode.vue';
 import MarkdownNode from '../components/MarkdownNode.vue';
 
 const workspaceStore = useWorkspaceStore();
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore);
+
+// Re-define AppNode type or import from store if you made it exportable
+interface ScenarioNodeData {
+  scenarioId: string;
+  [key: string]: any;
+}
+interface MarkdownNodeData {
+  markdownContent: string;
+  [key: string]: any;
+}
+type AppNode = Omit<Node, 'data'> & {
+  data?: ScenarioNodeData | MarkdownNodeData | Record<string, any>;
+};
+
 
 const { fitView, onPaneReady, onNodeDragStop } = useVueFlow();
 
@@ -37,45 +49,53 @@ const onConnect = (connectionParams: Connection) => {
     sourceHandle: connectionParams.targetHandle || undefined,
     targetHandle: connectionParams.sourceHandle || undefined,
     id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgtH'}-${connectionParams.sourceHandle || 'nodeSrcH'}-${Date.now()}`,
-    label: '', // Default label is empty
+    label: '',
     markerEnd: MarkerType.ArrowClosed,
   };
   edges.value = addEdgeHelper(newEdge, edges.value);
-  console.log('Created Edge:', JSON.parse(JSON.stringify(newEdge)));
 };
 
-// --- NEW FUNCTION TO HANDLE EDGE DOUBLE CLICK ---
 const handleEdgeDoubleClick = (event: EdgeDoubleClickEvent) => {
   const edgeToRemove = event.edge;
   if (edgeToRemove) {
-    // Optional: Confirm before deleting
     if (confirm(`Are you sure you want to delete the connection from "${edgeToRemove.source}" to "${edgeToRemove.target}"?`)) {
-      workspaceStore.removeEdge(edgeToRemove.id); // Use the store action
+      workspaceStore.removeEdge(edgeToRemove.id);
     }
   }
 };
-// --- END NEW FUNCTION ---
 
 const addNewScenarioNode = async () => {
-  const existingScenarioNodes = nodes.value.filter(n => n.type === 'scenarioCard').length;
-  const newNodeId = `scn-${existingScenarioNodes + 1}-${Date.now()}`;
-  const newNodeData = { scenarioId: existingScenarioNodes + 1 };
-  const newNode: Node = {
+  const existingScenarioNodesCount = nodes.value.filter(n => n.type === 'scenarioCard').length;
+  const newNodeId = `scn-${existingScenarioNodesCount + 1}-${Date.now()}`;
+  
+  // Prompt for a scenario ID or generate one
+  let scenarioIdentifier = prompt("Enter a Scenario ID (e.g., file name, descriptive_id):", `new-scenario-${existingScenarioNodesCount + 1}`);
+  if (!scenarioIdentifier || scenarioIdentifier.trim() === "") {
+    // If user cancels or enters empty, fallback to a generic ID or abort
+    // For this example, let's use a default if cancelled/empty
+    scenarioIdentifier = `scenario_${Date.now()}`; 
+  } else {
+    scenarioIdentifier = scenarioIdentifier.trim();
+  }
+
+  const newNodeData: ScenarioNodeData = { scenarioId: scenarioIdentifier };
+  
+  const newNode: AppNode = { // Use AppNode type
     id: newNodeId,
     type: 'scenarioCard',
-    label: `Scenario ${existingScenarioNodes + 1}`,
-    position: { x: 50 + (existingScenarioNodes % 4) * 400, y: 100 + Math.floor(existingScenarioNodes / 4) * 300 },
+    label: `Scenario: ${newNodeData.scenarioId}`, // Update label based on new string ID
+    position: { x: 50 + (existingScenarioNodesCount % 4) * 400, y: 100 + Math.floor(existingScenarioNodesCount / 4) * 300 },
     data: newNodeData,
     style: { width: '350px', height: '250px' }
   };
-  nodes.value.push(newNode);
+  nodes.value.push(newNode as Node); // Cast back to Node for the store if AppNode isn't used directly in store's nodes ref type
   await nextTick();
 };
 
 const addMarkdownNode = async () => {
   const existingMarkdownNodes = nodes.value.filter(n => n.type === 'markdownNode').length;
   const newNodeId = `md-${existingMarkdownNodes + 1}-${Date.now()}`;
-  const newNode: Node = {
+  const newNode: AppNode = { // Use AppNode type
     id: newNodeId,
     type: 'markdownNode',
     position: { x: 100 + (existingMarkdownNodes % 4) * 300, y: 450 + Math.floor(existingMarkdownNodes / 4) * 250 },
@@ -84,7 +104,7 @@ const addMarkdownNode = async () => {
     },
     style: { width: '250px', height: '180px' },
   };
-  nodes.value.push(newNode);
+  nodes.value.push(newNode as Node); // Cast back
   await nextTick();
 };
 
@@ -103,6 +123,7 @@ const saveLayout = () => {
     const nodesToSave = nodes.value.map(n => ({
       ...n,
       position: { ...n.position },
+      // Ensure data is stringified correctly, especially if it now contains varied string IDs
       data: n.data ? JSON.parse(JSON.stringify(n.data)) : undefined,
       style: n.style ? JSON.parse(JSON.stringify(n.style)) : undefined,
     }));
@@ -150,10 +171,11 @@ const handleFileLoad = async (event: Event) => {
           Array.isArray(loadedData.edges)
         ) {
           workspaceStore.updateHostUrl(loadedData.hostUrl);
+          // When loading, ensure scenarioId is treated as a string
           nodes.value = loadedData.nodes.map((n: any) => ({
             ...n,
             position: { x: n.position?.x || 0, y: n.position?.y || 0 },
-            data: n.data ? { ...n.data } : undefined,
+            data: n.data ? { ...n.data, scenarioId: n.data.scenarioId !== undefined ? String(n.data.scenarioId) : undefined } : undefined,
             style: n.style ? { ...n.style } : undefined,
           }));
           edges.value = loadedData.edges.map((edge: any) => ({
@@ -251,8 +273,6 @@ const handleFileLoad = async (event: Event) => {
   padding: 8px 12px;
   font-size: 12px;
 }
-
-/* --- Edge Styling --- */
 .vue-flow__edge-path {
   stroke: #888;
   stroke-width: 2.5;
