@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position, type NodeProps } from '@vue-flow/core'
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, watch, toRaw, onMounted, nextTick } from 'vue'
 import { useWorkspaceStore } from '../stores/workspace'
 import MarkdownLabel from './MarkdownLabel.vue'
 import EditMarkdownNodeModal from './EditMarkdownNodeModal.vue'
@@ -8,10 +8,24 @@ import EditMarkdownNodeModal from './EditMarkdownNodeModal.vue'
 const props = defineProps<NodeProps>()
 const store = useWorkspaceStore()
 
-const showEditModal = ref(false)
-const markdownContent = computed(() => props.data?.markdownContent || '')
+console.log(`[MarkdownNode ${props.id}] Initializing. Initial props.data:`, JSON.parse(JSON.stringify(props.data)));
 
-// --- Sizing and Resizing Logic for the Node itself ---
+// Local reactive state for the markdown content within this node instance
+const localMarkdownContent = ref(props.data?.markdownContent || '');
+
+// Watch for external changes to props.data.markdownContent (e.g., from loading a layout)
+// and update the local state if it's different.
+watch(() => props.data?.markdownContent, (newContentFromProps) => {
+  console.log(`[MarkdownNode ${props.id}] props.data.markdownContent externally changed to: "${newContentFromProps?.substring(0,30)}..."`);
+  if (newContentFromProps !== undefined && newContentFromProps !== localMarkdownContent.value) {
+    console.log(`[MarkdownNode ${props.id}] Updating localMarkdownContent from props.`);
+    localMarkdownContent.value = newContentFromProps;
+  }
+}, { immediate: false }); // Don't run immediately, let initial value be set by ref()
+
+const showEditModal = ref(false)
+
+// --- Sizing and Resizing Logic ---
 const nodeRef = ref<HTMLDivElement | null>(null);
 const isResizing = ref(false);
 const resizeStartX = ref(0);
@@ -22,7 +36,6 @@ const resizeStartHeight = ref(0);
 const minNodeWidth = 120;
 const minNodeHeight = 70;
 
-// --- Get dimensions DIRECTLY from the store's node data ---
 const storeNode = computed(() => store.nodes.find(n => n.id === props.id));
 
 const reactiveWidth = computed(() => {
@@ -30,7 +43,7 @@ const reactiveWidth = computed(() => {
   if (sNode?.style?.width) {
     return parseFloat(sNode.style.width);
   }
-  return sNode?.data?.width || 250; // Fallback
+  return sNode?.data?.width || 250;
 });
 
 const reactiveHeight = computed(() => {
@@ -38,32 +51,23 @@ const reactiveHeight = computed(() => {
   if (sNode?.style?.height) {
     return parseFloat(sNode.style.height);
   }
-  return sNode?.data?.height || 180; // Fallback
+  return sNode?.data?.height || 180;
 });
 
-
-const nodeStyle = computed(() => {
-  // This console log will now directly reflect changes from the store
-  // console.log(`nodeStyle computed from store: width=${reactiveWidth.value}px, height=${reactiveHeight.value}px`);
-  return {
-    width: `${reactiveWidth.value}px`,
-    height: `${reactiveHeight.value}px`,
-  };
-});
+const nodeStyle = computed(() => ({
+  width: `${reactiveWidth.value}px`,
+  height: `${reactiveHeight.value}px`,
+}));
 
 const handleResizeMouseDown = (event: MouseEvent) => {
-  if (!(event.target as HTMLElement).classList.contains('node-resize-handle')) {
-    return;
-  }
+  if (!(event.target as HTMLElement).classList.contains('node-resize-handle')) return;
   event.preventDefault();
   event.stopPropagation();
-
   isResizing.value = true;
   resizeStartX.value = event.clientX;
   resizeStartY.value = event.clientY;
-  resizeStartWidth.value = reactiveWidth.value; // Use current computed value from store
-  resizeStartHeight.value = reactiveHeight.value; // Use current computed value from store
-
+  resizeStartWidth.value = reactiveWidth.value;
+  resizeStartHeight.value = reactiveHeight.value;
   window.addEventListener('mousemove', handleResizeMouseMove);
   window.addEventListener('mouseup', handleResizeMouseUp);
 };
@@ -72,10 +76,8 @@ const handleResizeMouseMove = (event: MouseEvent) => {
   if (!isResizing.value) return;
   const dx = event.clientX - resizeStartX.value;
   const dy = event.clientY - resizeStartY.value;
-
   let newWidth = Math.max(minNodeWidth, resizeStartWidth.value + dx);
   let newHeight = Math.max(minNodeHeight, resizeStartHeight.value + dy);
-
   store.updateNodeDimensions(props.id, newWidth, newHeight);
 };
 
@@ -94,17 +96,30 @@ onBeforeUnmount(() => {
 
 // --- Modal Logic ---
 const handleDoubleClick = () => {
-  showEditModal.value = true
+  console.log(`[MarkdownNode ${props.id}] Double clicked. Opening modal. Current localMarkdownContent: "${localMarkdownContent.value.substring(0,30)}..."`);
+  showEditModal.value = true;
 }
 
 const handleSaveMarkdown = (newContent: string) => {
-  store.updateNodeData(props.id, { markdownContent: newContent })
-  showEditModal.value = false
+  console.log(`[MarkdownNode ${props.id}] handleSaveMarkdown called. New content for local: "${newContent.substring(0,30)}..."`);
+  localMarkdownContent.value = newContent; // Update local state FIRST
+  console.log(`[MarkdownNode ${props.id}] localMarkdownContent is now: "${localMarkdownContent.value.substring(0,30)}..."`);
+  
+  // Now, tell the store to update its version.
+  store.updateNodeData(props.id, { markdownContent: newContent });
+  console.log(`[MarkdownNode ${props.id}] Called store.updateNodeData.`);
+  
+  showEditModal.value = false;
 }
 
 const handleCancelEdit = () => {
-  showEditModal.value = false
+  console.log(`[MarkdownNode ${props.id}] Modal cancelled.`);
+  showEditModal.value = false;
 }
+
+// For the modal, pass the localMarkdownContent
+const initialModalValue = computed(() => localMarkdownContent.value);
+
 </script>
 
 <template>
@@ -115,14 +130,16 @@ const handleCancelEdit = () => {
     @dblclick.stop="handleDoubleClick"
     @mousedown.left="handleResizeMouseDown"
   >
-    <!-- TEMPORARY DEBUGGING REMOVED -->
+    <div style="position: absolute; top: -20px; left: 0; font-size: 10px; color: orange; background: rgba(0,0,0,0.5); padding: 2px; z-index: 100;">
+      Local: {{ localMarkdownContent?.substring(0,15) }}...
+    </div>
 
+    <!-- Bind to localMarkdownContent -->
     <MarkdownLabel
-      :label="markdownContent"
+      :label="localMarkdownContent" 
       class="markdown-label-component"
     />
 
-    <!-- Connection Handles -->
     <Handle id="top-source" type="source" :position="Position.Top" class="custom-handle" />
     <Handle id="top-target" type="target" :position="Position.Top" class="custom-handle custom-handle-target" />
     <Handle id="right-source" type="source" :position="Position.Right" class="custom-handle" />
@@ -136,7 +153,7 @@ const handleCancelEdit = () => {
 
     <EditMarkdownNodeModal
       :show="showEditModal"
-      :initial-value="markdownContent"
+      :initial-value="initialModalValue"
       @save="handleSaveMarkdown"
       @cancel="handleCancelEdit"
     />
