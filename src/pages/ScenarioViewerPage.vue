@@ -52,10 +52,11 @@ const addNewScenarioNode = async () => {
     type: 'scenarioCard',
     label: `Scenario ${existingScenarioNodes + 1}`,
     position: { x: 50 + (existingScenarioNodes % 4) * 400, y: 100 + Math.floor(existingScenarioNodes / 4) * 300 },
-    data: newNodeData
+    data: newNodeData,
+    style: { width: '350px', height: '250px' } // Added style for new scenario nodes
   };
   nodes.value.push(newNode);
-  await nextTick();
+  await nextTick(); // Ensure DOM updates before any potential fitView or other operations
 };
 
 const addMarkdownNode = async () => {

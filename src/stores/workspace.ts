@@ -13,6 +13,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       position: { x: 50, y: 100 },
       data: { scenarioId: 1 },
       label: 'Scenario 1',
+      style: { width: '350px', height: '250px' }, // Added style
     },
     {
       id: 'scn-2',
@@ -20,18 +21,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       position: { x: 450, y: 100 },
       data: { scenarioId: 2 },
       label: 'Scenario 2',
+      style: { width: '350px', height: '250px' }, // Added style
     },
     {
       id: 'md-1',
-      type: 'markdownNode', // New node type
+      type: 'markdownNode',
       position: { x: 50, y: 400 },
       data: {
         markdownContent: "## Welcome!\n\nThis is a **Markdown Note**.\n\n- Double-click to edit.\n- Resize me using the handle at the bottom-right.",
-        // width: 280, // Store raw numbers in data if preferred for persistence
-        // height: 200
       },
-      style: { width: '280px', height: '200px' }, // Vue Flow uses style for rendering dimensions
-      // label: 'My First Note'
+      style: { width: '280px', height: '200px' },
     },
   ])
   const edges = ref<Edge[]>([
@@ -66,7 +65,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  // Generic data update for any node
   function updateNodeData(nodeId: string, newData: Partial<any>) {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node) {
@@ -81,36 +79,20 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const nodeIndex = nodes.value.findIndex(n => n.id === nodeId);
     if (nodeIndex !== -1) {
       const nodeToUpdate = nodes.value[nodeIndex];
-
-      // Create a new style object to help ensure reactivity
       const newStyle = {
-        ...nodeToUpdate.style, // Spread existing styles to preserve any other style properties
+        ...nodeToUpdate.style,
         width: `${width}px`,
         height: `${height}px`,
       };
-
-      // Update the node in the array by creating a new node object with the new style.
-      // This often helps trigger reactivity more reliably in lists.
       nodes.value[nodeIndex] = {
-        ...nodeToUpdate, // Spread all existing properties of the node
-        style: newStyle,   // Assign the new style object
-        // data: { // If you also store width/height in data, update it here
-        //   ...nodeToUpdate.data,
-        //   width: width,
-        //   height: height,
-        // }
+        ...nodeToUpdate,
+        style: newStyle,
       };
-
-      // Alternative: Just update the style property reference if the above is too much
-      // nodeToUpdate.style = newStyle;
-      // Vue.set(nodes.value, nodeIndex, nodeToUpdate); // For Vue 2 style reactivity if needed, but usually not for Vue 3 with ref arrays.
-
-      console.log(`Updated dimensions for node ${nodeId}: ${width}x${height} (store updated with new style object)`);
+      // console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`); // Logging can be verbose
     } else {
       console.error(`Node with id ${nodeId} not found for dimension update.`);
     }
   }
-
 
   return {
     hostUrl,
