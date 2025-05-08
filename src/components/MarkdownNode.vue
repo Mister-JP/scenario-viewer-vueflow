@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position, type NodeProps } from '@vue-flow/core'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../stores/workspace'
 import MarkdownLabel from './MarkdownLabel.vue'
 import EditMarkdownNodeModal from './EditMarkdownNodeModal.vue'
@@ -11,16 +11,74 @@ const store = useWorkspaceStore()
 const showEditModal = ref(false)
 const markdownContent = computed(() => props.data?.markdownContent || '')
 
-const nodeWidth = computed(() => {
+// --- Sizing and Resizing Logic for the Node itself ---
+const nodeRef = ref<HTMLDivElement | null>(null);
+const isResizing = ref(false);
+const resizeStartX = ref(0);
+const resizeStartY = ref(0);
+const resizeStartWidth = ref(0);
+const resizeStartHeight = ref(0);
+
+const minNodeWidth = 120; // Minimum overall width for the node
+const minNodeHeight = 70;  // Minimum overall height for the node
+
+const currentNodeWidth = computed(() => {
   const styleWidth = props.style?.width;
-  return typeof styleWidth === 'string' ? styleWidth : `${props.data?.width || 250}px`;
+  return typeof styleWidth === 'string' ? parseFloat(styleWidth) : (props.data?.width || 250);
 });
 
-const nodeHeight = computed(() => {
+const currentNodeHeight = computed(() => {
   const styleHeight = props.style?.height;
-  return typeof styleHeight === 'string' ? styleHeight : `${props.data?.height || 180}px`;
+  return typeof styleHeight === 'string' ? parseFloat(styleHeight) : (props.data?.height || 180);
 });
 
+const nodeStyle = computed(() => ({
+  width: `${currentNodeWidth.value}px`,
+  height: `${currentNodeHeight.value}px`,
+}));
+
+const handleResizeMouseDown = (event: MouseEvent) => {
+  if (!(event.target as HTMLElement).classList.contains('node-resize-handle')) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation(); // Important to prevent node dragging via Vue Flow
+
+  isResizing.value = true;
+  resizeStartX.value = event.clientX;
+  resizeStartY.value = event.clientY;
+  resizeStartWidth.value = currentNodeWidth.value;
+  resizeStartHeight.value = currentNodeHeight.value;
+
+  window.addEventListener('mousemove', handleResizeMouseMove);
+  window.addEventListener('mouseup', handleResizeMouseUp);
+};
+
+const handleResizeMouseMove = (event: MouseEvent) => {
+  if (!isResizing.value) return;
+  const dx = event.clientX - resizeStartX.value;
+  const dy = event.clientY - resizeStartY.value;
+
+  let newWidth = Math.max(minNodeWidth, resizeStartWidth.value + dx);
+  let newHeight = Math.max(minNodeHeight, resizeStartHeight.value + dy);
+
+  store.updateNodeDimensions(props.id, newWidth, newHeight);
+};
+
+const handleResizeMouseUp = () => {
+  if (isResizing.value) {
+    isResizing.value = false;
+    window.removeEventListener('mousemove', handleResizeMouseMove);
+    window.removeEventListener('mouseup', handleResizeMouseUp);
+  }
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', handleResizeMouseMove);
+  window.removeEventListener('mouseup', handleResizeMouseUp);
+});
+
+// --- Modal Logic ---
 const handleDoubleClick = () => {
   showEditModal.value = true
 }
@@ -33,51 +91,33 @@ const handleSaveMarkdown = (newContent: string) => {
 const handleCancelEdit = () => {
   showEditModal.value = false
 }
-
-const handleDimensionsUpdate = (dimensions: { width: number; height: number }) => {
-  const currentWidthPx = parseFloat(props.style?.width as string || '0');
-  const currentHeightPx = parseFloat(props.style?.height as string || '0');
-
-  if (dimensions.width !== currentWidthPx || dimensions.height !== currentHeightPx) {
-    store.updateNodeDimensions(props.id, dimensions.width, dimensions.height);
-  }
-}
-
-const markdownLabelKey = computed(() => `${props.id}-mdlabel-${nodeWidth.value}-${nodeHeight.value}`);
-
 </script>
 
 <template>
   <div
-    class="markdown-node-wrapper bg-gray-700 border border-gray-600 rounded-md shadow-md flex flex-col relative"
-    :style="{ width: nodeWidth, height: nodeHeight }"
+    ref="nodeRef"
+    class="markdown-node-wrapper"
+    :style="nodeStyle"
     @dblclick.stop="handleDoubleClick"
+    @mousedown.left="handleResizeMouseDown"
   >
     <MarkdownLabel
-      :key="markdownLabelKey"
       :label="markdownContent"
-      :initial-width="nodeWidth"
-      :initial-height="nodeHeight"
-      @update:dimensions="handleDimensionsUpdate"
-      class="flex-grow"
+      class="markdown-label-component"
     />
 
-    <!-- Handles (Source = outgoing, Target = incoming) -->
-    <!-- Top Handles -->
-    <Handle id="top-source" type="source" :position="Position.Top" class="custom-handle" :style="{ top: '-5px' }" />
-    <Handle id="top-target" type="target" :position="Position.Top" class="custom-handle custom-handle-target" :style="{ top: '-5px' }" />
+    <!-- Connection Handles: Positioned absolutely relative to this wrapper -->
+    <Handle id="top-source" type="source" :position="Position.Top" class="custom-handle" />
+    <Handle id="top-target" type="target" :position="Position.Top" class="custom-handle custom-handle-target" />
+    <Handle id="right-source" type="source" :position="Position.Right" class="custom-handle" />
+    <Handle id="right-target" type="target" :position="Position.Right" class="custom-handle custom-handle-target" />
+    <Handle id="bottom-source" type="source" :position="Position.Bottom" class="custom-handle" />
+    <Handle id="bottom-target" type="target" :position="Position.Bottom" class="custom-handle custom-handle-target" />
+    <Handle id="left-source" type="source" :position="Position.Left" class="custom-handle" />
+    <Handle id="left-target" type="target" :position="Position.Left" class="custom-handle custom-handle-target" />
 
-    <!-- Right Handles -->
-    <Handle id="right-source" type="source" :position="Position.Right" class="custom-handle" :style="{ right: '-5px' }" />
-    <Handle id="right-target" type="target" :position="Position.Right" class="custom-handle custom-handle-target" :style="{ right: '-5px' }" />
-
-    <!-- Bottom Handles -->
-    <Handle id="bottom-source" type="source" :position="Position.Bottom" class="custom-handle" :style="{ bottom: '-5px' }" />
-    <Handle id="bottom-target" type="target" :position="Position.Bottom" class="custom-handle custom-handle-target" :style="{ bottom: '-5px' }" />
-
-    <!-- Left Handles -->
-    <Handle id="left-source" type="source" :position="Position.Left" class="custom-handle" :style="{ left: '-5px' }" />
-    <Handle id="left-target" type="target" :position="Position.Left" class="custom-handle custom-handle-target" :style="{ left: '-5px' }" />
+    <!-- Resize Handle for the Node itself -->
+    <div class="node-resize-handle"></div>
 
     <EditMarkdownNodeModal
       :show="showEditModal"
@@ -90,41 +130,74 @@ const markdownLabelKey = computed(() => `${props.id}-mdlabel-${nodeWidth.value}-
 
 <style scoped>
 .markdown-node-wrapper {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  min-width: 120px; /* Corresponds to MarkdownLabel's minWidth + padding/border */
-  min-height: 70px; /* Corresponds to MarkdownLabel's minHeight + padding/border */
+  background-color: #4A5568; /* tailwindcss gray-700 */
+  border: 1px solid #2D3748; /* tailwindcss gray-800 */
+  border-radius: 8px; /* Slightly larger radius for the main node */
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* md shadow */
   display: flex;
   flex-direction: column;
-  /* REMOVE overflow: hidden; to prevent clipping of handles and ensure resize works as expected */
+  position: relative; /* Crucial for absolute positioning of handles and resize corner */
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  min-width: v-bind(minNodeWidth + 'px');
+  min-height: v-bind(minNodeHeight + 'px');
+  /* overflow: hidden; NO LONGER NEEDED - REMOVE TO SHOW HANDLES */
 }
 
-/* Corrected selectors for selected/dragging states and opacity */
-.markdown-node-wrapper:hover .custom-handle,
-.vue-flow__node-selected .custom-handle, /* VueFlow adds this class to the root node element */
-.vue-flow__node-dragging .custom-handle {
-  opacity: 1; /* Make fully visible on interaction */
+.markdown-label-component {
+  flex-grow: 1; /* Makes MarkdownLabel fill the available space */
+  margin: 4px; /* Creates a small "frame" of the node's background around the white label */
+  min-height: 0; /* Essential for flex children that need to shrink and scroll within */
+  min-width: 0;  /* Essential for flex children that need to shrink and scroll within */
+  border-radius: 4px; /* Give the inner label a slightly smaller radius */
+  overflow: hidden; /* The label component itself will handle its content scrolling */
 }
 
+/* --- Connection Handles --- */
 .custom-handle {
-  /* Changed to amber, increased default opacity, and ensured border is distinct */
-  @apply w-3 h-3 bg-amber-400 rounded-full border-2 border-gray-900 shadow-sm; /* Changed to amber, darker border for visibility */
-  opacity: 0.6; /* Make them visible by default but slightly transparent */
+  @apply w-3 h-3 bg-amber-400 rounded-full border-2 border-gray-900 shadow-md; /* Amber color, dark border, shadow */
+  opacity: 0.7; /* Start somewhat visible */
   transition: opacity 0.2s, background-color 0.2s;
-  z-index: 20;
+  z-index: 10; /* Ensure handles are clickable */
+  position: absolute; /* Positioned relative to .markdown-node-wrapper */
+}
+
+/* Precise positioning for handles on the node's perimeter */
+.custom-handle[data-handlepos="top"] { top: -6px; left: 50%; transform: translateX(-50%); }
+.custom-handle[data-handlepos="right"] { right: -6px; top: 50%; transform: translateY(-50%); }
+.custom-handle[data-handlepos="bottom"] { bottom: -6px; left: 50%; transform: translateX(-50%); }
+.custom-handle[data-handlepos="left"] { left: -6px; top: 50%; transform: translateY(-50%); }
+
+/* Make handles fully visible on node hover/selection/drag */
+.markdown-node-wrapper:hover .custom-handle,
+:global(.vue-flow__node-selected) .custom-handle,
+:global(.vue-flow__node-dragging) .custom-handle {
+  opacity: 1;
 }
 .custom-handle:hover {
-  @apply bg-sky-500; /* Keep hover effect or change as desired */
-  opacity: 1 !important;
+  @apply bg-sky-500; /* Visual feedback on handle hover */
+  opacity: 1 !important; /* Ensure it's fully opaque */
 }
 .custom-handle-target {
-  /* Optional: Slightly different style for target handles if needed for visual distinction */
-  /* Example: @apply bg-pink-400; */
+  /* Optional: if you want target handles to look slightly different */
+  /* e.g., @apply bg-pink-400; */
 }
 
-/* Remove external margin from MarkdownLabel via this specific rule */
-/* Let MarkdownLabel fill the entire space of MarkdownNode's wrapper */
-.markdown-node-wrapper > .custom-markdown-label-wrapper {
-  margin: 0 !important; /* Ensure no margin from this rule */
-  flex-grow: 1; /* Allow MarkdownLabel to take up available space */
+/* --- Node Resize Handle (bottom-right corner of the node) --- */
+.node-resize-handle {
+  position: absolute;
+  bottom: 0px; /* Align with bottom border */
+  right: 0px;  /* Align with right border */
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, transparent 0%, transparent 50%, #a0aec0 50%, #a0aec0 100%); /* Tailwind gray-500 */
+  border-bottom-right-radius: 6px; /* Match node's corner radius */
+  cursor: nwse-resize;
+  opacity: 0.7;
+  transition: opacity 0.2s, background-color 0.2s;
+  z-index: 20; /* Ensure it's above other elements like handles if overlapping */
+}
+.node-resize-handle:hover {
+  opacity: 1;
+  background: linear-gradient(135deg, transparent 0%, transparent 50%, #718096 50%, #718096 100%); /* Tailwind gray-600 */
 }
 </style>
