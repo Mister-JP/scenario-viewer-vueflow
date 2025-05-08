@@ -1,6 +1,12 @@
 # Scenario Viewer with Vue Flow
 
+
 **Scenario Viewer VueFlow** is an interactive web application built with Vue 3, TypeScript, Vite, and the powerful Vue Flow library. It allows users to create, visualize, and manage interconnected scenarios and markdown notes in a dynamic flowchart-style interface. The application features user authentication, customizable node types (scenario cards and markdown notes), resizable nodes, edge management, and the ability to save and load workspace layouts.
+
+## Live Demo
+
+This application is hosted on Netlify and can be accessed here:
+[https://polite-buttercream-a1439c.netlify.app/](https://polite-buttercream-a1439c.netlify.app/)
 
 ## Table of Contents
 
