@@ -1,7 +1,7 @@
 // src/stores/workspace.ts
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { Node, Edge } from '@vue-flow/core'
+import type { Node, Edge } from '@vue-flow/core' // Edge type is already imported
 import { MarkerType } from '@vue-flow/core'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
@@ -13,7 +13,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       position: { x: 50, y: 100 },
       data: { scenarioId: 1 },
       label: 'Scenario 1',
-      style: { width: '350px', height: '250px' }, // Added style
+      style: { width: '350px', height: '250px' },
     },
     {
       id: 'scn-2',
@@ -21,7 +21,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       position: { x: 450, y: 100 },
       data: { scenarioId: 2 },
       label: 'Scenario 2',
-      style: { width: '350px', height: '250px' }, // Added style
+      style: { width: '350px', height: '250px' },
     },
     {
       id: 'md-1',
@@ -69,7 +69,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node) {
       node.data = { ...node.data, ...newData };
-      console.log(`Updated data for node ${nodeId}:`, JSON.parse(JSON.stringify(node.data)));
+      // console.log(`Updated data for node ${nodeId}:`, JSON.parse(JSON.stringify(node.data)));
     } else {
       console.error(`Node with id ${nodeId} not found for data update.`);
     }
@@ -88,11 +88,18 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         ...nodeToUpdate,
         style: newStyle,
       };
-      // console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`); // Logging can be verbose
+      // console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`);
     } else {
       console.error(`Node with id ${nodeId} not found for dimension update.`);
     }
   }
+
+  // --- NEW FUNCTION TO REMOVE AN EDGE ---
+  function removeEdge(edgeIdToRemove: string) {
+    edges.value = edges.value.filter(edge => edge.id !== edgeIdToRemove);
+    console.log(`Removed edge: ${edgeIdToRemove}`);
+  }
+  // --- END NEW FUNCTION ---
 
   return {
     hostUrl,
@@ -102,5 +109,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     updateNodeScenarioId,
     updateNodeData,
     updateNodeDimensions,
+    removeEdge, // Expose the new function
   }
 })

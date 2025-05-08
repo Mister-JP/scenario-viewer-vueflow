@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node } from '@vue-flow/core';
+// Ensure EdgeDoubleClickEvent is imported
+import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node, type EdgeDoubleClickEvent } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { MiniMap } from '@vue-flow/minimap';
 import { Controls } from '@vue-flow/controls';
@@ -36,12 +37,24 @@ const onConnect = (connectionParams: Connection) => {
     sourceHandle: connectionParams.targetHandle || undefined,
     targetHandle: connectionParams.sourceHandle || undefined,
     id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgtH'}-${connectionParams.sourceHandle || 'nodeSrcH'}-${Date.now()}`,
-    label: '',
+    label: '', // Default label is empty
     markerEnd: MarkerType.ArrowClosed,
   };
   edges.value = addEdgeHelper(newEdge, edges.value);
   console.log('Created Edge:', JSON.parse(JSON.stringify(newEdge)));
 };
+
+// --- NEW FUNCTION TO HANDLE EDGE DOUBLE CLICK ---
+const handleEdgeDoubleClick = (event: EdgeDoubleClickEvent) => {
+  const edgeToRemove = event.edge;
+  if (edgeToRemove) {
+    // Optional: Confirm before deleting
+    if (confirm(`Are you sure you want to delete the connection from "${edgeToRemove.source}" to "${edgeToRemove.target}"?`)) {
+      workspaceStore.removeEdge(edgeToRemove.id); // Use the store action
+    }
+  }
+};
+// --- END NEW FUNCTION ---
 
 const addNewScenarioNode = async () => {
   const existingScenarioNodes = nodes.value.filter(n => n.type === 'scenarioCard').length;
@@ -53,10 +66,10 @@ const addNewScenarioNode = async () => {
     label: `Scenario ${existingScenarioNodes + 1}`,
     position: { x: 50 + (existingScenarioNodes % 4) * 400, y: 100 + Math.floor(existingScenarioNodes / 4) * 300 },
     data: newNodeData,
-    style: { width: '350px', height: '250px' } // Added style for new scenario nodes
+    style: { width: '350px', height: '250px' }
   };
   nodes.value.push(newNode);
-  await nextTick(); // Ensure DOM updates before any potential fitView or other operations
+  await nextTick();
 };
 
 const addMarkdownNode = async () => {
@@ -206,6 +219,7 @@ const handleFileLoad = async (event: Event) => {
         :edges="edges"
         :node-types="nodeTypes"
         @connect="onConnect"
+        @edge-double-click="handleEdgeDoubleClick"
         :fit-view-on-init="false"
         class="basic-flow"
         :default-viewport="{ zoom: 1 }"
