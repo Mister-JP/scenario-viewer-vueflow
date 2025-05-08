@@ -58,21 +58,24 @@ const onConnect = (connectionParams: Connection) => {
 const handleEdgeDoubleClick = (event: EdgeDoubleClickEvent) => {
   const edgeToRemove = event.edge;
   if (edgeToRemove) {
-    if (confirm(`Are you sure you want to delete the connection from "${edgeToRemove.source}" to "${edgeToRemove.target}"?`)) {
+    if (window.confirm(`Are you sure you want to delete the connection from "${edgeToRemove.source}" to "${edgeToRemove.target}"?`)) {
       workspaceStore.removeEdge(edgeToRemove.id);
     }
   }
+};
+
+const handleEditHostUrl = () => {
+  const currentHost = hostUrl.value || 'http://localhost:8080';
+  const newUrl = window.prompt('Enter new host URL:', currentHost);
+  workspaceStore.updateHostUrl(newUrl || currentHost);
 };
 
 const addNewScenarioNode = async () => {
   const existingScenarioNodesCount = nodes.value.filter(n => n.type === 'scenarioCard').length;
   const newNodeId = `scn-${existingScenarioNodesCount + 1}-${Date.now()}`;
   
-  // Prompt for a scenario ID or generate one
-  let scenarioIdentifier = prompt("Enter a Scenario ID (e.g., file name, descriptive_id):", `new-scenario-${existingScenarioNodesCount + 1}`);
+  let scenarioIdentifier = window.prompt("Enter a Scenario ID (e.g., file name, descriptive_id):", `new-scenario-${existingScenarioNodesCount + 1}`);
   if (!scenarioIdentifier || scenarioIdentifier.trim() === "") {
-    // If user cancels or enters empty, fallback to a generic ID or abort
-    // For this example, let's use a default if cancelled/empty
     scenarioIdentifier = `scenario_${Date.now()}`; 
   } else {
     scenarioIdentifier = scenarioIdentifier.trim();
@@ -80,22 +83,22 @@ const addNewScenarioNode = async () => {
 
   const newNodeData: ScenarioNodeData = { scenarioId: scenarioIdentifier };
   
-  const newNode: AppNode = { // Use AppNode type
+  const newNode: AppNode = {
     id: newNodeId,
     type: 'scenarioCard',
-    label: `Scenario: ${newNodeData.scenarioId}`, // Update label based on new string ID
+    label: `Scenario: ${newNodeData.scenarioId}`,
     position: { x: 50 + (existingScenarioNodesCount % 4) * 400, y: 100 + Math.floor(existingScenarioNodesCount / 4) * 300 },
     data: newNodeData,
     style: { width: '350px', height: '250px' }
   };
-  nodes.value.push(newNode as Node); // Cast back to Node for the store if AppNode isn't used directly in store's nodes ref type
+  nodes.value.push(newNode as Node);
   await nextTick();
 };
 
 const addMarkdownNode = async () => {
   const existingMarkdownNodes = nodes.value.filter(n => n.type === 'markdownNode').length;
   const newNodeId = `md-${existingMarkdownNodes + 1}-${Date.now()}`;
-  const newNode: AppNode = { // Use AppNode type
+  const newNode: AppNode = {
     id: newNodeId,
     type: 'markdownNode',
     position: { x: 100 + (existingMarkdownNodes % 4) * 300, y: 450 + Math.floor(existingMarkdownNodes / 4) * 250 },
@@ -104,7 +107,7 @@ const addMarkdownNode = async () => {
     },
     style: { width: '250px', height: '180px' },
   };
-  nodes.value.push(newNode as Node); // Cast back
+  nodes.value.push(newNode as Node);
   await nextTick();
 };
 
@@ -123,7 +126,6 @@ const saveLayout = () => {
     const nodesToSave = nodes.value.map(n => ({
       ...n,
       position: { ...n.position },
-      // Ensure data is stringified correctly, especially if it now contains varied string IDs
       data: n.data ? JSON.parse(JSON.stringify(n.data)) : undefined,
       style: n.style ? JSON.parse(JSON.stringify(n.style)) : undefined,
     }));
@@ -171,7 +173,6 @@ const handleFileLoad = async (event: Event) => {
           Array.isArray(loadedData.edges)
         ) {
           workspaceStore.updateHostUrl(loadedData.hostUrl);
-          // When loading, ensure scenarioId is treated as a string
           nodes.value = loadedData.nodes.map((n: any) => ({
             ...n,
             position: { x: n.position?.x || 0, y: n.position?.y || 0 },
@@ -212,7 +213,7 @@ const handleFileLoad = async (event: Event) => {
       <h1 class="text-lg font-semibold">Scenario Viewer</h1>
       <div class="flex items-center space-x-2">
         <span class="text-sm">Host: {{ hostUrl }}</span>
-        <button @click="workspaceStore.updateHostUrl(prompt('Enter new host URL:', hostUrl ? hostUrl : 'http://localhost:8080') || (hostUrl ? hostUrl : 'http://localhost:8080'))" class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 text-sm rounded">
+        <button @click="handleEditHostUrl" class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 text-sm rounded">
           Edit Host
         </button>
         <button @click="addNewScenarioNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-sm rounded">

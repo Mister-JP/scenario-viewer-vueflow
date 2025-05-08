@@ -82,9 +82,8 @@ onBeforeUnmount(() => {
 });
 
 const iframeSrc = computed(() => {
-  if (props.data && (typeof props.data.scenarioId === 'string' || typeof props.data.scenarioId === 'number')) { // Allow string or number for backward compatibility if needed
+  if (props.data && (typeof props.data.scenarioId === 'string' || typeof props.data.scenarioId === 'number')) { 
     const baseUrl = store.hostUrl.replace(/\/$/, '');
-    // Potentially encode scenarioId if it can contain special characters for a URL
     return `${baseUrl}?scenario=${encodeURIComponent(props.data.scenarioId)}`;
   }
   return 'about:blank';
@@ -94,15 +93,13 @@ const cardLabel = computed(() => props.label || `Scenario: ${props.data?.scenari
 
 const editScenarioId = () => {
   const currentId = props.data?.scenarioId;
-  // Prompt for a string, ensure it's treated as a string
-  const newIdString = prompt(`Enter new Scenario ID for node "${props.id}":`, currentId !== undefined ? String(currentId) : '');
+  const newIdString = window.prompt(`Enter new Scenario ID for node "${props.id}":`, currentId !== undefined ? String(currentId) : '');
 
-  if (newIdString !== null) { // User didn't cancel prompt
-    // Basic validation: ensure it's not an empty string, or add more complex validation as needed
+  if (newIdString !== null) { 
     if (newIdString.trim() !== "") {
       store.updateNodeScenarioId(props.id, newIdString.trim());
     } else {
-      alert('Invalid Scenario ID. It cannot be empty.');
+      window.alert('Invalid Scenario ID. It cannot be empty.');
     }
   }
 }
