@@ -1,32 +1,49 @@
-<!-- src/components/MarkdownLabel.vue -->
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { marked } from 'marked';
 
 const props = defineProps<{
   label?: string | object;
-  // Optional initial dimensions (could be useful later)
-  initialWidth?: number;
-  initialHeight?: number;
+  initialWidth?: number | string; // Can be number or string like '250px'
+  initialHeight?: number | string; // Can be number or string like '150px'
 }>();
 
+const emit = defineEmits<{
+  (e: 'update:dimensions', dimensions: { width: number; height: number }): void;
+}>();
+
+// --- Parse initial dimensions ---
+const parseDimension = (dim: number | string | undefined, defaultValue: number): number => {
+  if (typeof dim === 'string') {
+    return parseInt(dim, 10) || defaultValue;
+  }
+  return dim || defaultValue;
+};
+
 // --- State for Resizing ---
-// Use refs for reactive width and height
-// Initialize with props or defaults
-const currentWidth = ref<number>(props.initialWidth || 250); // Default width
-const currentHeight = ref<number | null>(props.initialHeight || null); // Default to auto height initially
+const currentWidth = ref<number>(parseDimension(props.initialWidth, 250));
+const currentHeight = ref<number | null>(props.initialHeight ? parseDimension(props.initialHeight, null) : null); // Allow auto height if initialHeight is not set or 0
+
 const isResizing = ref(false);
 const startX = ref(0);
 const startY = ref(0);
 const startWidth = ref(0);
 const startHeight = ref(0);
-const wrapperRef = ref<HTMLDivElement | null>(null); // Ref for the main wrapper element
+const wrapperRef = ref<HTMLDivElement | null>(null);
 
-// --- Minimum Dimensions ---
 const minWidth = 100;
 const minHeight = 50;
 
-// --- Marked Configuration ---
+// --- Watch for prop changes to update internal dimensions ---
+watch(() => props.initialWidth, (newVal) => {
+  currentWidth.value = parseDimension(newVal, minWidth);
+});
+watch(() => props.initialHeight, (newVal) => {
+  // If new value is provided, use it; otherwise, keep existing or allow auto if it was null
+  currentHeight.value = newVal ? parseDimension(newVal, minHeight) : currentHeight.value;
+});
+
+
 marked.setOptions({
   gfm: true,
   breaks: false,
@@ -34,7 +51,6 @@ marked.setOptions({
   smartypants: true
 });
 
-// --- Rendered Markdown ---
 const renderedMarkdown = computed(() => {
   if (typeof props.label === 'string' && props.label) {
     try {
@@ -47,45 +63,32 @@ const renderedMarkdown = computed(() => {
   return '';
 });
 
-// --- Resize Event Handlers ---
 const handleMouseDown = (event: MouseEvent) => {
-  // Only start resize if clicking the handle specifically
   if (!(event.target as HTMLElement).classList.contains('resize-handle')) {
     return;
   }
-
   isResizing.value = true;
   startX.value = event.clientX;
   startY.value = event.clientY;
   startWidth.value = wrapperRef.value?.offsetWidth || currentWidth.value;
-
-  // If height is currently 'auto', get the actual rendered height
   const currentElemHeight = wrapperRef.value?.offsetHeight;
-  startHeight.value = currentHeight.value || currentElemHeight || minHeight;
-  // Set explicit height to start resizing from actual value if it was auto
+  startHeight.value = currentHeight.value === null ? (currentElemHeight || minHeight) : currentHeight.value;
+
   if(currentHeight.value === null && currentElemHeight){
-     currentHeight.value = currentElemHeight;
+     currentHeight.value = currentElemHeight; // Set explicit height to resize from
   }
 
-
-  // Attach listeners to the window to capture mouse movements anywhere
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
-
-  // Prevent default text selection/dragging
   event.preventDefault();
 };
 
 const handleMouseMove = (event: MouseEvent) => {
   if (!isResizing.value) return;
-
   const dx = event.clientX - startX.value;
   const dy = event.clientY - startY.value;
-
-  // Calculate new dimensions, applying minimum constraints
   const newWidth = Math.max(minWidth, startWidth.value + dx);
   const newHeight = Math.max(minHeight, startHeight.value + dy);
-
   currentWidth.value = newWidth;
   currentHeight.value = newHeight;
 };
@@ -93,26 +96,36 @@ const handleMouseMove = (event: MouseEvent) => {
 const handleMouseUp = () => {
   if (isResizing.value) {
     isResizing.value = false;
-    // Remove window listeners
     window.removeEventListener('mousemove', handleMouseMove);
     window.removeEventListener('mouseup', handleMouseUp);
+    // Emit the final dimensions
+    emit('update:dimensions', { width: currentWidth.value, height: currentHeight.value || minHeight });
   }
 };
 
-// --- Style Calculation ---
 const wrapperStyle = computed(() => ({
   width: `${currentWidth.value}px`,
-  // Apply height only if it's not null (allowing auto initially)
   height: currentHeight.value !== null ? `${currentHeight.value}px` : 'auto',
-  // Add resize cursor when hovering the handle area implicitly
-  // cursor: isResizing.value ? 'nwse-resize' : 'default', // Cursor handled by handle CSS
 }));
 
-// --- Lifecycle Hooks for Cleanup ---
 onBeforeUnmount(() => {
-  // Ensure listeners are removed if component is unmounted while resizing
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('mouseup', handleMouseUp);
+});
+
+// If height is auto, emit its actual rendered height once mounted and rendered
+onMounted(async () => {
+  await nextTick();
+  if (currentHeight.value === null && wrapperRef.value) {
+    const actualHeight = wrapperRef.value.offsetHeight;
+    if (actualHeight > 0) {
+        // Do not set currentHeight.value here if we want it to remain 'auto'
+        // until explicitly resized.
+        // Only emit if you want the parent to know the initial auto height.
+        // For now, only emitting on resize to avoid potential loops if parent sets height back to auto.
+        // emit('update:dimensions', { width: currentWidth.value, height: actualHeight });
+    }
+  }
 });
 
 </script>
@@ -124,10 +137,7 @@ onBeforeUnmount(() => {
     :style="wrapperStyle"
     @mousedown.passive="handleMouseDown"
     >
-    <!-- Content Area -->
     <div class="markdown-label-content" v-html="renderedMarkdown"></div>
-
-    <!-- Resize Handle -->
     <div class="resize-handle"></div>
   </div>
 </template>
@@ -141,44 +151,41 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   font-size: 12px;
   line-height: 1.5;
-  /* max-width removed as width is now dynamic */
   text-align: left;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   border: 1px solid #e5e7eb;
   white-space: normal;
-  position: relative; /* Needed for absolute positioning of handle */
-  overflow: hidden; /* Clip content, show scrollbars on content div if needed */
-  resize: none; /* Disable browser default resize */
-  min-width: v-bind(minWidth + 'px'); /* Apply CSS min-width */
-  min-height: v-bind(minHeight + 'px');/* Apply CSS min-height */
-}
-
-.resizable {
-   /* Indicate it can be resized, although handle provides specific cursor */
-   /* cursor: grab; */ /* Optional: Cursor for the whole element */
+  position: relative;
+  overflow: hidden;
+  resize: none;
+  min-width: v-bind(minWidth + 'px');
+  min-height: v-bind(minHeight + 'px');
+  display: flex; /* Ensure content area expands */
+  flex-direction: column; /* Stack content and handle */
 }
 
 .markdown-label-content {
   width: 100%;
-  height: 100%;
-  overflow: auto; /* Allow content scrolling if it overflows */
-  padding-bottom: 10px; /* Add padding at bottom to avoid handle overlap */
+  height: 100%; /* Take available space */
+  overflow: auto;
+  padding-bottom: 10px; /* Space for resize handle not to overlap text */
   box-sizing: border-box;
+  flex-grow: 1; /* Allow content to grow */
 }
 
-/* Resize Handle Styling */
 .resize-handle {
   position: absolute;
   bottom: 0;
   right: 0;
   width: 12px;
   height: 12px;
-  background-color: #cbd5e1; /* Tailwind gray-300 */
-  border: 1px solid #94a3b8; /* Tailwind slate-400 */
+  background-color: #cbd5e1;
+  border: 1px solid #94a3b8;
   border-radius: 2px;
-  cursor: nwse-resize; /* Diagonal resize cursor */
+  cursor: nwse-resize;
   opacity: 0.6;
   transition: opacity 0.2s;
+  z-index: 10; /* Ensure handle is clickable */
 }
 .resize-handle:hover {
   opacity: 1;
@@ -186,13 +193,8 @@ onBeforeUnmount(() => {
 }
 
 /* --- Styles for v-html content using :deep() --- */
-/* (Keep the minimalistic styles from the previous response here) */
-.markdown-label-content :deep(> *:first-child) {
-  margin-top: 0;
-}
-.markdown-label-content :deep(> *:last-child) {
-  margin-bottom: 0;
-}
+.markdown-label-content :deep(> *:first-child) { margin-top: 0; }
+.markdown-label-content :deep(> *:last-child) { margin-bottom: 0; }
 .markdown-label-content :deep(p) { margin-top: 0; margin-bottom: 0.6em; color: #4b5563; }
 .markdown-label-content :deep(h1), .markdown-label-content :deep(h2), .markdown-label-content :deep(h3), .markdown-label-content :deep(h4), .markdown-label-content :deep(h5), .markdown-label-content :deep(h6) { margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; font-weight: 600; color: #1f2937; border-bottom: none; padding-bottom: 0; }
 .markdown-label-content :deep(h1) { font-size: 1.3em; }

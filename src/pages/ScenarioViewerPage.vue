@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node, type EdgeMouseEvent } from '@vue-flow/core';
+import { VueFlow, useVueFlow, addEdge as addEdgeHelper, MarkerType, type Connection, type Edge, type Node } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { MiniMap } from '@vue-flow/minimap';
 import { Controls } from '@vue-flow/controls';
@@ -9,85 +9,93 @@ import { computed, markRaw, nextTick, ref as vueRef } from 'vue';
 
 // Import components
 import ScenarioCardNode from '../components/ScenarioCardNode.vue';
-import EditLabelModal from '../components/EditLabelModal.vue';
-import MarkdownLabel from '../components/MarkdownLabel.vue'; // Ensure this path is correct
+import MarkdownNode from '../components/MarkdownNode.vue';
 
 const workspaceStore = useWorkspaceStore();
 const { nodes, edges, hostUrl } = storeToRefs(workspaceStore);
 
-const { fitView, onPaneReady, getViewport, getNodes, onNodeDragStop } = useVueFlow();
+const { fitView, onPaneReady, onNodeDragStop } = useVueFlow();
 
 onPaneReady(async ({ fitView: fitViewInstance }) => {
   console.log('Vue Flow Pane is ready.');
   await nextTick();
   setTimeout(() => {
-    console.log('Attempting to fit view in onPaneReady.');
     fitViewInstance({ padding: 0.1 });
   }, 50);
 });
 
 const nodeTypes = computed(() => ({
   scenarioCard: markRaw(ScenarioCardNode),
+  markdownNode: markRaw(MarkdownNode),
 }));
 
-// --- Edge Label Editing Modal State ---
-const showEditModal = vueRef(false);
-const editingEdgeId = vueRef<string | null>(null);
-const currentEditText = vueRef('');
-// ---
-
 const onConnect = (connectionParams: Connection) => {
-  console.log('Raw connectionParams from event:', JSON.parse(JSON.stringify(connectionParams)));
-
   const newEdge: Edge = {
     source: connectionParams.target!,
     target: connectionParams.source!,
     sourceHandle: connectionParams.targetHandle || undefined,
     targetHandle: connectionParams.sourceHandle || undefined,
-    id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgt'}-${connectionParams.sourceHandle || 'nodeSrc'}-${Date.now()}`,
-    label: 'New Connection', // Default label for new connections, can be Markdown
+    id: `e-${connectionParams.target}-${connectionParams.source}-${connectionParams.targetHandle || 'nodeTgtH'}-${connectionParams.sourceHandle || 'nodeSrcH'}-${Date.now()}`,
+    label: '',
     markerEnd: MarkerType.ArrowClosed,
-    // REMOVED: labelBgStyle, labelBgPadding, labelBgBorderRadius
   };
   edges.value = addEdgeHelper(newEdge, edges.value);
   console.log('Created Edge:', JSON.parse(JSON.stringify(newEdge)));
 };
 
-const addNewNode = async () => {
-  console.log('--- addNewNode START ---');
-  const newNodeId = `scn-${nodes.value.length + 1}-${Date.now()}`;
-  const newNodeData = { scenarioId: nodes.value.length + 1 };
+const addNewScenarioNode = async () => {
+  const existingScenarioNodes = nodes.value.filter(n => n.type === 'scenarioCard').length;
+  const newNodeId = `scn-${existingScenarioNodes + 1}-${Date.now()}`;
+  const newNodeData = { scenarioId: existingScenarioNodes + 1 };
   const newNode: Node = {
     id: newNodeId,
     type: 'scenarioCard',
-    label: `Scenario ${nodes.value.length + 1}`,
-    position: { x: 50 + (nodes.value.length % 3) * 400, y: 400 + Math.floor(nodes.value.length / 3) * 300 },
+    label: `Scenario ${existingScenarioNodes + 1}`,
+    position: { x: 50 + (existingScenarioNodes % 4) * 400, y: 100 + Math.floor(existingScenarioNodes / 4) * 300 },
     data: newNodeData
   };
   nodes.value.push(newNode);
-  console.log(`Pushed new node to store: ${newNodeId}`);
-  await nextTick(); // Wait for DOM update
-  console.log('--- addNewNode END ---');
+  await nextTick();
 };
+
+const addMarkdownNode = async () => {
+  const existingMarkdownNodes = nodes.value.filter(n => n.type === 'markdownNode').length;
+  const newNodeId = `md-${existingMarkdownNodes + 1}-${Date.now()}`;
+  const newNode: Node = {
+    id: newNodeId,
+    type: 'markdownNode',
+    position: { x: 100 + (existingMarkdownNodes % 4) * 300, y: 450 + Math.floor(existingMarkdownNodes / 4) * 250 },
+    data: {
+      markdownContent: `# New Note ${existingMarkdownNodes + 1}\n\nStart writing your thoughts here...`
+    },
+    style: { width: '250px', height: '180px' },
+  };
+  nodes.value.push(newNode);
+  await nextTick();
+};
+
 
 onNodeDragStop(({ node: draggedNodeInstance }) => {
   const storeNode = nodes.value.find(n => n.id === draggedNodeInstance.id);
   if (storeNode) {
     storeNode.position = { ...draggedNodeInstance.position };
-    console.log(`Updated position for node ${draggedNodeInstance.id} in Pinia store.`);
   }
 });
 
-// --- START: Save and Load Layout ---
 const fileInput = vueRef<HTMLInputElement | null>(null);
 
 const saveLayout = () => {
   try {
-    const nodesToSave = nodes.value.map(n => ({ ...n, position: { ...n.position } }));
+    const nodesToSave = nodes.value.map(n => ({
+      ...n,
+      position: { ...n.position },
+      data: n.data ? JSON.parse(JSON.stringify(n.data)) : undefined,
+      style: n.style ? JSON.parse(JSON.stringify(n.style)) : undefined,
+    }));
     const layoutData = {
       hostUrl: hostUrl.value,
       nodes: nodesToSave,
-      edges: JSON.parse(JSON.stringify(edges.value)),
+      edges: JSON.parse(JSON.stringify(edges.value.map(edge => ({ ...edge, label: edge.label || '' })))),
     };
     const jsonString = JSON.stringify(layoutData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -100,7 +108,6 @@ const saveLayout = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(href);
-    console.log('Layout saved.');
     alert('Layout saved successfully!');
   } catch (error) {
     console.error('Failed to save layout:', error);
@@ -132,15 +139,14 @@ const handleFileLoad = async (event: Event) => {
           nodes.value = loadedData.nodes.map((n: any) => ({
             ...n,
             position: { x: n.position?.x || 0, y: n.position?.y || 0 },
-            data: { ...n.data },
+            data: n.data ? { ...n.data } : undefined,
+            style: n.style ? { ...n.style } : undefined,
           }));
           edges.value = loadedData.edges.map((edge: any) => ({
             ...edge,
             markerEnd: edge.markerEnd || MarkerType.ArrowClosed,
             label: edge.label || '',
-            // REMOVED: labelBgStyle, labelBgPadding, etc.
           }));
-          console.log('Layout loaded successfully.');
           await nextTick();
           fitView({ padding: 0.1 });
           alert('Layout loaded successfully!');
@@ -148,7 +154,8 @@ const handleFileLoad = async (event: Event) => {
           alert('Invalid layout file format.');
         }
       } catch (error) {
-        alert('Failed to load or parse layout file.');
+        console.error('Failed to load or parse layout file.', error);
+        alert('Failed to load or parse layout file. See console for details.');
       } finally {
         if (fileInput.value) fileInput.value.value = '';
       }
@@ -160,47 +167,23 @@ const handleFileLoad = async (event: Event) => {
     reader.readAsText(file);
   }
 };
-// --- END: Save and Load Layout ---
 
-// --- START: Edge Label Editing ---
-const onEdgeDoubleClick = (event: EdgeMouseEvent) => {
-  const edge = event.edge;
-  editingEdgeId.value = edge.id;
-  currentEditText.value = typeof edge.label === 'string' ? edge.label : '';
-  showEditModal.value = true;
-};
-
-const handleSaveLabel = (newLabel: string) => {
-  if (editingEdgeId.value) {
-    const edgeId = editingEdgeId.value;
-    edges.value = edges.value.map(e =>
-      e.id === edgeId ? { ...e, label: newLabel } : e
-    );
-    console.log(`Updated label for edge ${edgeId}`);
-  }
-  closeEditModal();
-};
-
-const closeEditModal = () => {
-  showEditModal.value = false;
-  editingEdgeId.value = null;
-  currentEditText.value = '';
-};
-// --- END: Edge Label Editing ---
 </script>
 
 <template>
   <div class="w-screen h-screen flex flex-col bg-gray-800">
     <header class="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center flex-shrink-0">
-      <!-- Header content -->
       <h1 class="text-lg font-semibold">Scenario Viewer</h1>
       <div class="flex items-center space-x-2">
         <span class="text-sm">Host: {{ hostUrl }}</span>
         <button @click="workspaceStore.updateHostUrl(prompt('Enter new host URL:', hostUrl ? hostUrl : 'http://localhost:8080') || (hostUrl ? hostUrl : 'http://localhost:8080'))" class="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 text-sm rounded">
           Edit Host
         </button>
-        <button @click="addNewNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-sm rounded">
-          Add Node
+        <button @click="addNewScenarioNode" class="bg-green-500 hover:bg-green-700 text-white py-1 px-2 text-sm rounded">
+          Add Scenario Node
+        </button>
+        <button @click="addMarkdownNode" class="bg-teal-500 hover:bg-teal-700 text-white py-1 px-2 text-sm rounded">
+          Add Markdown Note
         </button>
         <button @click="fitView({ padding: 0.1 })" class="bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 text-sm rounded">
           Fit View
@@ -222,7 +205,6 @@ const closeEditModal = () => {
         :edges="edges"
         :node-types="nodeTypes"
         @connect="onConnect"
-        @edge-double-click="onEdgeDoubleClick"
         :fit-view-on-init="false"
         class="basic-flow"
         :default-viewport="{ zoom: 1 }"
@@ -232,29 +214,12 @@ const closeEditModal = () => {
         <Background :pattern-color="'#666'" :gap="20" />
         <MiniMap />
         <Controls />
-
-        <!-- Use the slot to render the edge label using our Markdown component -->
-        <template #edge-label="props">
-           <!-- TEMPORARY LOGGING: Uncomment to see props in console -->
-           <!-- {{ console.log('Edge slot props for edge', props.id, ':', JSON.parse(JSON.stringify(props))) }} -->
-           <MarkdownLabel :label="props.label" />
-        </template>
-
       </VueFlow>
     </div>
-
-    <!-- Edit Label Modal -->
-    <EditLabelModal
-      :show="showEditModal"
-      :initial-value="currentEditText"
-      @save="handleSaveLabel"
-      @cancel="closeEditModal"
-    />
   </div>
 </template>
 
 <style>
-/* Container styles remain the same */
 .vue-flow-container {
   width: 100%;
   height: 100%;
@@ -281,29 +246,5 @@ const closeEditModal = () => {
 .vue-flow__edge:hover .vue-flow__edge-path {
   stroke: #adadad;
   stroke-width: 3.5;
-}
-
-/* --- Edge Label Styling --- */
-/* Ensure the slotted label area is interactive for double-click */
-.vue-flow__edge .vue-flow__edge-label {
-  pointer-events: all; /* Make the foreignObject container interactive */
-  cursor: pointer;
-  /* No background here; MarkdownLabel handles its own */
-}
-
-/* Styling for the foreignObject wrapper provided by Vue Flow for the #edge-label slot */
-/* --- TEMPORARILY COMMENTED OUT FOR DEBUGGING --- */
-
-.vue-flow__edge-label foreignObject {
-  overflow: visible !important;
-  transform: translate(-50%, -50%);
-  width: auto;
-  height: auto;
-}
-
-
-/* Hide Vue Flow's default SVG text label if it somehow still renders */
-.vue-flow__edge-text {
-  display: none !important;
 }
 </style>

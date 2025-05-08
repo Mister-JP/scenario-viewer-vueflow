@@ -2,36 +2,43 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { Node, Edge } from '@vue-flow/core'
-import { MarkerType } from '@vue-flow/core' // MODIFIED: Import MarkerType
+import { MarkerType } from '@vue-flow/core'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const hostUrl = ref<string>(localStorage.getItem('scenario-host') || 'http://localhost:8080')
   const nodes = ref<Node[]>([
     {
-      id: '1',
+      id: 'scn-1',
       type: 'scenarioCard',
-      position: { x: 100, y: 100 },
+      position: { x: 50, y: 100 },
       data: { scenarioId: 1 },
+      label: 'Scenario 1',
     },
     {
-      id: '2',
+      id: 'scn-2',
       type: 'scenarioCard',
-      position: { x: 500, y: 250 },
+      position: { x: 450, y: 100 },
       data: { scenarioId: 2 },
+      label: 'Scenario 2',
+    },
+    {
+      id: 'md-1',
+      type: 'markdownNode', // New node type
+      position: { x: 50, y: 400 },
+      data: {
+        markdownContent: "## Welcome!\n\nThis is a **Markdown Note**.\n\n- Double-click to edit.\n- Resize me using the handle at the bottom-right.",
+      },
+      style: { width: '280px', height: '200px' }, // Initial dimensions
+      // label: 'My First Note' // Optional: for display in devtools or if you add a header
     },
   ])
   const edges = ref<Edge[]>([
     {
-      id: 'e1-2',
-      source: '1',
-      target: '2',
-      label: 'Leads to',
-      markerEnd: MarkerType.ArrowClosed, // MODIFIED: Added for initial edge
-      // Optional: Specify source and target handles if this initial edge
-      // should connect to specific points rather than node centers/defaults.
-      // For example, if node '1' should connect from its right side to node '2's left side:
-      // sourceHandle: 'right-source',
-      // targetHandle: 'left-target',
+      id: 'e-scn1-scn2',
+      source: 'scn-1',
+      target: 'scn-2',
+      label: '', // No label on connections anymore
+      markerEnd: MarkerType.ArrowClosed,
     },
   ])
 
@@ -52,17 +59,49 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   function updateNodeScenarioId(nodeId: string, newScenarioId: number) {
     const node = nodes.value.find(n => n.id === nodeId);
-    if (node && node.data) {
-      console.log(`Updating scenarioId for node ${nodeId} from ${node.data.scenarioId} to ${newScenarioId}`);
+    if (node && node.data && node.type === 'scenarioCard') {
       node.data.scenarioId = newScenarioId;
-      // Logging the state of the specific node's data after update
-      console.log(`Node ${nodeId} data after update:`, JSON.parse(JSON.stringify(node.data)));
-      // Logging the whole nodes array to verify the change within the array context
-      // console.log('Full nodes array after update:', JSON.parse(JSON.stringify(nodes.value)));
-    } else {
-      console.error(`Node with id ${nodeId} not found or has no data object.`);
     }
   }
+
+  // Generic data update for any node
+  function updateNodeData(nodeId: string, newData: Partial<any>) {
+    const node = nodes.value.find(n => n.id === nodeId);
+    if (node) {
+      node.data = { ...node.data, ...newData };
+      console.log(`Updated data for node ${nodeId}:`, JSON.parse(JSON.stringify(node.data)));
+    } else {
+      console.error(`Node with id ${nodeId} not found for data update.`);
+    }
+  }
+
+  // Specific for MarkdownNode content, or use generic updateNodeData
+  // function updateNodeMarkdownContent(nodeId: string, markdownContent: string) {
+  //   const node = nodes.value.find(n => n.id === nodeId);
+  //   if (node && node.type === 'markdownNode') {
+  //     if (!node.data) node.data = {};
+  //     node.data.markdownContent = markdownContent;
+  //   }
+  // }
+
+  function updateNodeDimensions(nodeId: string, width: number, height: number) {
+    const node = nodes.value.find(n => n.id === nodeId);
+    if (node) {
+      // Ensure style object exists
+      if (!node.style) node.style = {};
+      node.style.width = `${width}px`;
+      node.style.height = `${height}px`;
+      // Optionally, store raw numbers in data if needed for persistence or logic,
+      // but Vue Flow primarily uses node.style for rendering dimensions.
+      // if (!node.data) node.data = {};
+      // node.data.width = width;
+      // node.data.height = height;
+      console.log(`Updated dimensions for node ${nodeId}: ${width}x${height}`);
+    } else {
+      console.error(`Node with id ${nodeId} not found for dimension update.`);
+    }
+  }
+
 
   return {
     hostUrl,
@@ -70,5 +109,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     edges,
     updateHostUrl,
     updateNodeScenarioId,
+    updateNodeData, // Export generic updater
+    // updateNodeMarkdownContent,
+    updateNodeDimensions,
   }
 })
