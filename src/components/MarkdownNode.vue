@@ -35,8 +35,6 @@ const handleCancelEdit = () => {
 }
 
 const handleDimensionsUpdate = (dimensions: { width: number; height: number }) => {
-  // Check if dimensions actually changed to prevent potential loops
-  // Note: props.style.width/height will be strings like '250px'
   const currentWidthPx = parseFloat(props.style?.width as string || '0');
   const currentHeightPx = parseFloat(props.style?.height as string || '0');
 
@@ -45,30 +43,23 @@ const handleDimensionsUpdate = (dimensions: { width: number; height: number }) =
   }
 }
 
-// Ensure key for MarkdownLabel updates when dimensions change via props
-// to force re-evaluation of its internal initialWidth/Height if needed.
 const markdownLabelKey = computed(() => `${props.id}-mdlabel-${nodeWidth.value}-${nodeHeight.value}`);
 
 </script>
 
 <template>
   <div
-    class="markdown-node-wrapper bg-gray-700 border border-gray-600 rounded-md shadow-md flex flex-col overflow-hidden relative"
+    class="markdown-node-wrapper bg-gray-700 border border-gray-600 rounded-md shadow-md flex flex-col relative"
     :style="{ width: nodeWidth, height: nodeHeight }"
     @dblclick.stop="handleDoubleClick"
   >
-    <!-- Optional: Node Header (non-editable for now) -->
-    <!-- <div class="node-header bg-gray-800 text-xs text-gray-400 px-2 py-1 border-b border-gray-600 cursor-move">
-      Markdown Note
-    </div> -->
-
     <MarkdownLabel
       :key="markdownLabelKey"
       :label="markdownContent"
       :initial-width="nodeWidth"
       :initial-height="nodeHeight"
       @update:dimensions="handleDimensionsUpdate"
-      class="flex-grow m-1"
+      class="flex-grow"
     />
 
     <!-- Handles (Source = outgoing, Target = incoming) -->
@@ -104,22 +95,25 @@ const markdownLabelKey = computed(() => `${props.id}-mdlabel-${nodeWidth.value}-
   min-height: 70px; /* Corresponds to MarkdownLabel's minHeight + padding/border */
   display: flex;
   flex-direction: column;
+  /* REMOVE overflow: hidden; to prevent clipping of handles and ensure resize works as expected */
 }
 
+/* Corrected selectors for selected/dragging states and opacity */
 .markdown-node-wrapper:hover .custom-handle,
-.vue-flow__node-selected .markdown-node-wrapper .custom-handle,
-.vue-flow__node-dragging .markdown-node-wrapper .custom-handle {
-  opacity: 0.8;
+.vue-flow__node-selected .custom-handle, /* VueFlow adds this class to the root node element */
+.vue-flow__node-dragging .custom-handle {
+  opacity: 1; /* Make fully visible on interaction */
 }
 
 .custom-handle {
-  @apply w-3 h-3 bg-teal-400 rounded-full border-2 border-gray-800; /* Different color for MarkdownNode handles */
-  opacity: 0;
-  transition: opacity 0.2s;
-  z-index: 20; /* Ensure handles are above MarkdownLabel's resize handle if overlapping */
+  /* Changed to amber, increased default opacity, and ensured border is distinct */
+  @apply w-3 h-3 bg-amber-400 rounded-full border-2 border-gray-900 shadow-sm; /* Changed to amber, darker border for visibility */
+  opacity: 0.6; /* Make them visible by default but slightly transparent */
+  transition: opacity 0.2s, background-color 0.2s;
+  z-index: 20;
 }
 .custom-handle:hover {
-  @apply bg-sky-500;
+  @apply bg-sky-500; /* Keep hover effect or change as desired */
   opacity: 1 !important;
 }
 .custom-handle-target {
@@ -127,10 +121,10 @@ const markdownLabelKey = computed(() => `${props.id}-mdlabel-${nodeWidth.value}-
   /* Example: @apply bg-pink-400; */
 }
 
-/* The MarkdownLabel will have its own padding and border.
-   If you want the node wrapper to have additional padding around MarkdownLabel: */
+/* Remove external margin from MarkdownLabel via this specific rule */
+/* Let MarkdownLabel fill the entire space of MarkdownNode's wrapper */
 .markdown-node-wrapper > .custom-markdown-label-wrapper {
-  margin: 2px; /* Small margin around the label component inside the node */
+  margin: 0 !important; /* Ensure no margin from this rule */
   flex-grow: 1; /* Allow MarkdownLabel to take up available space */
 }
 </style>
