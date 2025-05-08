@@ -49,7 +49,7 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   // Pinia is initialized in main.ts before the router, so useAuthStore() is safe here.
   const auth = useAuthStore();
 
